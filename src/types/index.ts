@@ -67,7 +67,6 @@ export interface OppositionHistory {
 export interface TournamentSettings {
   pointsToWin: number;
   finalsFormat: 'traditional' | 'semifinal';
-  autoGenerateRounds: boolean;
 }
 
 export interface TournamentState {

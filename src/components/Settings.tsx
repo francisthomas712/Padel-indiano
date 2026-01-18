@@ -55,24 +55,6 @@ export const Settings: React.FC<SettingsProps> = ({
           </p>
         </div>
 
-        <div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={settings.autoGenerateRounds}
-              onChange={(e) => onSettingsChange({ ...settings, autoGenerateRounds: e.target.checked })}
-              disabled={disabled}
-              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:cursor-not-allowed"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              Auto-generate next round when all matches complete
-            </span>
-          </label>
-          <p className="text-xs text-gray-500 mt-1 ml-6">
-            When enabled, a new round will automatically be created when all matches in the current round are completed
-          </p>
-        </div>
-
         {disabled && (
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
             <p className="text-sm text-blue-700">

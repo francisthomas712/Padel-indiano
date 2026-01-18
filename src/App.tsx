@@ -8,6 +8,7 @@ import {
   Share2,
   FileText,
   Save,
+  Plus,
   Upload,
   Undo,
   Redo,
@@ -281,7 +282,7 @@ const App: React.FC = () => {
   }, [state.rounds, updateState]);
 
   // Complete a match
-  const completeMatch = useCallback((roundId: number, matchId: string, preventAutoGenerate = false) => {
+  const completeMatch = useCallback((roundId: number, matchId: string) => {
     const round = state.rounds.find(r => r.id === roundId);
     const match = round?.matches.find(m => m.id === matchId);
 
@@ -353,7 +354,6 @@ const App: React.FC = () => {
           m.id === matchId ? { ...m, completed: true, endTime: Date.now() } : m
         );
         const allMatchesComplete = updatedMatches.every(m => m.completed);
-        console.log(`Match ${matchId} completed. Updated matches:`, updatedMatches);
         return {
           ...r,
           matches: updatedMatches,
@@ -378,17 +378,7 @@ const App: React.FC = () => {
     );
 
     toast.success('Match completed!');
-
-    // Auto-generate next round if enabled and not prevented
-    if (!preventAutoGenerate && state.settings.autoGenerateRounds) {
-      const completedRound = updatedRounds.find(r => r.id === roundId);
-      if (completedRound && completedRound.completed) {
-        setTimeout(() => {
-          generateNextRound();
-        }, 500);
-      }
-    }
-  }, [state, updateState, generateNextRound]);
+  }, [state, updateState]);
 
   // Start editing a match
   const startEditingMatch = useCallback((roundId: number, matchId: string) => {
@@ -474,14 +464,14 @@ const App: React.FC = () => {
 
   // Save edited match
   const saveEditedMatch = useCallback((roundId: number, matchId: string) => {
-    completeMatch(roundId, matchId, true);
+    completeMatch(roundId, matchId);
     setEditingMatch(null);
     toast.success('Match updated!');
   }, [completeMatch]);
 
   // Cancel editing
   const cancelEditingMatch = useCallback((roundId: number, matchId: string) => {
-    completeMatch(roundId, matchId, true);
+    completeMatch(roundId, matchId);
     setEditingMatch(null);
     toast('Edit cancelled');
   }, [completeMatch]);
@@ -577,6 +567,99 @@ const App: React.FC = () => {
     );
 
     toast.success('Match deleted');
+  }, [state, updateState]);
+
+  // Delete entire round
+  const deleteRound = useCallback((roundId: number) => {
+    if (!window.confirm('Are you sure you want to delete this entire round? All matches in this round will be deleted. This action cannot be undone.')) {
+      return;
+    }
+
+    const round = state.rounds.find(r => r.id === roundId);
+    if (!round) return;
+
+    // If round has completed matches, need to reverse stats
+    const completedMatches = round.matches.filter(m => m.completed);
+
+    if (completedMatches.length > 0) {
+      const updatedPlayers = [...state.players];
+      const newPartnershipHistory = { ...state.partnershipHistory };
+      const newOppositionHistory = { ...state.oppositionHistory };
+
+      // Reverse stats for each completed match
+      completedMatches.forEach(match => {
+        const pair1PlayerIds = match.pair1.players.map(p => p.id);
+        const pair2PlayerIds = match.pair2.players.map(p => p.id);
+
+        // Reverse player stats
+        pair1PlayerIds.forEach(playerId => {
+          const player = updatedPlayers.find(p => p.id === playerId);
+          if (player) {
+            player.points -= match.score1;
+            player.matchesPlayed -= 1;
+            if (match.score1 > match.score2) player.wins -= 1;
+            else if (match.score1 < match.score2) player.losses -= 1;
+          }
+        });
+
+        pair2PlayerIds.forEach(playerId => {
+          const player = updatedPlayers.find(p => p.id === playerId);
+          if (player) {
+            player.points -= match.score2;
+            player.matchesPlayed -= 1;
+            if (match.score2 > match.score1) player.wins -= 1;
+            else if (match.score2 < match.score1) player.losses -= 1;
+          }
+        });
+
+        // Reverse partnership history
+        [pair1PlayerIds, pair2PlayerIds].forEach(pairIds => {
+          const [p1, p2] = pairIds;
+          if (newPartnershipHistory[p1]?.[p2]) {
+            newPartnershipHistory[p1][p2] -= 1;
+            if (newPartnershipHistory[p1][p2] === 0) delete newPartnershipHistory[p1][p2];
+          }
+          if (newPartnershipHistory[p2]?.[p1]) {
+            newPartnershipHistory[p2][p1] -= 1;
+            if (newPartnershipHistory[p2][p1] === 0) delete newPartnershipHistory[p2][p1];
+          }
+        });
+
+        // Reverse opposition history
+        pair1PlayerIds.forEach(p1 => {
+          pair2PlayerIds.forEach(p2 => {
+            if (newOppositionHistory[p1]?.[p2]) {
+              newOppositionHistory[p1][p2] -= 1;
+              if (newOppositionHistory[p1][p2] === 0) delete newOppositionHistory[p1][p2];
+            }
+            if (newOppositionHistory[p2]?.[p1]) {
+              newOppositionHistory[p2][p1] -= 1;
+              if (newOppositionHistory[p2][p1] === 0) delete newOppositionHistory[p2][p1];
+            }
+          });
+        });
+      });
+
+      updateState({
+        players: updatedPlayers,
+        partnershipHistory: newPartnershipHistory,
+        oppositionHistory: newOppositionHistory
+      });
+    }
+
+    // Remove the round
+    const updatedRounds = state.rounds.filter(r => r.id !== roundId);
+
+    updateState(
+      { rounds: updatedRounds },
+      {
+        type: 'match_delete',
+        timestamp: Date.now(),
+        data: { roundId }
+      }
+    );
+
+    toast.success('Round deleted');
   }, [state, updateState]);
 
   // Get leaderboard
@@ -965,12 +1048,6 @@ const App: React.FC = () => {
                       Share
                     </button>
                   </div>
-
-                  {state.settings.autoGenerateRounds && (
-                    <p className="text-sm text-gray-600 text-center">
-                      Rounds generate automatically when all matches complete
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -1138,11 +1215,20 @@ const App: React.FC = () => {
                               </p>
                             )}
                           </div>
-                          {round.completed && (
-                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                              Completed
-                            </span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {round.completed && (
+                              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                                Completed
+                              </span>
+                            )}
+                            <button
+                              onClick={() => deleteRound(round.id)}
+                              className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                              title="Delete this round"
+                            >
+                              Delete Round
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-4">
@@ -1163,6 +1249,17 @@ const App: React.FC = () => {
                         </div>
                       </div>
                     ))}
+
+                    {/* Generate Next Round Button */}
+                    <div className="bg-white rounded-2xl shadow-xl p-6">
+                      <button
+                        onClick={generateNextRound}
+                        className="w-full py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold text-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Generate Next Round
+                      </button>
+                    </div>
                   </div>
 
                   {/* Leaderboard */}
@@ -1201,8 +1298,8 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="bg-purple-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">3. Automatic Rounds</h4>
-                  <p>When all matches in a round complete, the next round generates automatically with new pairings based on updated standings.</p>
+                  <h4 className="font-semibold text-gray-800 mb-2">3. Manual Round Generation</h4>
+                  <p>Click "Generate Next Round" to create new pairings based on updated standings. You can also delete entire rounds if you want to redo the matchups.</p>
                 </div>
 
                 <div className="bg-orange-50 p-4 rounded-lg">

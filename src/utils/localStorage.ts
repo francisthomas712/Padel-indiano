@@ -3,11 +3,18 @@ import { TournamentState } from '../types';
 const STORAGE_KEY = 'padel-indiano-tournament';
 const TEMPLATES_KEY = 'padel-indiano-templates';
 const HISTORY_KEY = 'padel-indiano-history';
+const VERSION_KEY = 'padel-indiano-version';
+const CURRENT_VERSION = '2.0.0'; // Increment when schema changes
 
 export const saveTournamentState = (state: TournamentState): void => {
   try {
-    const serialized = JSON.stringify(state);
+    const dataWithVersion = {
+      version: CURRENT_VERSION,
+      state
+    };
+    const serialized = JSON.stringify(dataWithVersion);
     localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
   } catch (error) {
     console.error('Failed to save tournament state:', error);
   }
@@ -15,11 +22,24 @@ export const saveTournamentState = (state: TournamentState): void => {
 
 export const loadTournamentState = (): TournamentState | null => {
   try {
+    // Check version compatibility
+    const storedVersion = localStorage.getItem(VERSION_KEY);
+    if (storedVersion !== CURRENT_VERSION) {
+      console.log(`Version mismatch (stored: ${storedVersion}, current: ${CURRENT_VERSION}). Clearing old data.`);
+      clearTournamentState();
+      localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+      return null;
+    }
+
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (serialized === null) {
       return null;
     }
-    return JSON.parse(serialized);
+
+    const parsed = JSON.parse(serialized);
+    // Handle both old format (direct state) and new format (with version wrapper)
+    const state = parsed.version ? parsed.state : parsed;
+    return state;
   } catch (error) {
     console.error('Failed to load tournament state:', error);
     return null;
