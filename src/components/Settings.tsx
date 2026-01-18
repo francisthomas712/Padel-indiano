@@ -19,22 +19,20 @@ export const Settings: React.FC<SettingsProps> = ({
       <div className="bg-white rounded-lg p-6 space-y-6">
         <div>
           <label htmlFor="pointsToWin" className="block text-sm font-medium text-gray-700 mb-2">
-            Points to Win (Regular Matches)
+            Points to Win
           </label>
-          <select
+          <input
             id="pointsToWin"
+            type="number"
+            min="3"
+            max="21"
             value={settings.pointsToWin}
             onChange={(e) => onSettingsChange({ ...settings, pointsToWin: Number(e.target.value) })}
             disabled={disabled}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          >
-            <option value={16}>16 points</option>
-            <option value={24}>24 points</option>
-            <option value={32}>32 points</option>
-            <option value={40}>40 points</option>
-          </select>
+          />
           <p className="text-xs text-gray-500 mt-1">
-            Number of points needed to win a regular match
+            First team to reach this score wins (e.g., 7 means first to 7 points). Max game could be 7-6.
           </p>
         </div>
 

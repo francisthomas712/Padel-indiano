@@ -26,6 +26,7 @@ export interface Match {
   completed: boolean;
   startTime?: number;
   endTime?: number;
+  currentServer?: 'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2';
 }
 
 export interface Round {
@@ -43,7 +44,7 @@ export interface FinalsMatch {
   score2: number;
   winner: number | null;
   completed: boolean;
-  isGoldenPoint: boolean;
+  currentServer?: 'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2';
 }
 
 export interface PlayerWithStats extends Player {

@@ -8,7 +8,8 @@ A modern, feature-rich tournament management system for Padel Indiano with dynam
 - **Dynamic Skill-Based Pairing**: Players are automatically paired each round based on their Points Per Game (PPG)
 - **Smart Matching**: Algorithm ensures variety in partnerships and competitive matches
 - **Automatic Round Generation**: New rounds auto-generate when all matches complete (configurable)
-- **Finals System**: Traditional Padel scoring (0-15-30-40) with Golden Point at deuce
+- **First-to-X Scoring**: Simple point-based scoring (default: first to 7 points wins)
+- **Service Rotation**: Service rotates between teams and players each point
 
 ### 💾 Data Management
 - **Auto-Save**: All tournament data automatically saved to localStorage
@@ -40,9 +41,9 @@ A modern, feature-rich tournament management system for Padel Indiano with dynam
 - **Accessibility**: ARIA labels and keyboard navigation
 
 ### ⚙️ Configurable Settings
-- Points to win (16, 24, 32, or 40 points)
-- Finals format (Traditional or Semifinals)
-- Auto-generate rounds toggle
+- **Points to Win**: Customizable (default 7, range 3-21)
+- **Finals Format**: Traditional (1st+4th vs 2nd+3rd) or Semifinals
+- **Auto-Generate Rounds**: Toggle automatic round creation
 
 ## Getting Started
 
@@ -89,6 +90,7 @@ npm run test:ui
 
 ### 2. Configure Settings (Optional)
 - Go to Settings tab to adjust tournament parameters
+- **Points to Win**: Default is 7 (first team to 7 points wins)
 - Settings are locked once the tournament starts
 
 ### 3. Start Tournament
@@ -97,6 +99,8 @@ npm run test:ui
 
 ### 4. Score Matches
 - Use +/- buttons to adjust scores
+- **First to X points wins** (e.g., first to 7)
+- Service rotates between teams and players each point
 - Click "Complete Match" when done
 - Round auto-generates when all matches complete
 
@@ -108,8 +112,8 @@ npm run test:ui
 ### 6. Finals
 - Click "Initiate Finals" when ready
 - Top 4 players: 1st+4th vs 2nd+3rd
-- Single game with traditional Padel scoring
-- Golden Point at 40-40 (deuce)
+- Same scoring format as regular matches (first to X points)
+- Service rotates each point
 
 ### 7. Export & Share
 - Export tournament data as PDF, JSON, or text report

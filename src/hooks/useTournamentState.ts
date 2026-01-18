@@ -3,7 +3,7 @@ import { TournamentState, HistoryEntry } from '../types';
 import { saveTournamentState, loadTournamentState } from '../utils/localStorage';
 
 const initialSettings = {
-  pointsToWin: 32,
+  pointsToWin: 7,
   finalsFormat: 'traditional' as const,
   autoGenerateRounds: true
 };

@@ -1,36 +1,44 @@
 import { describe, it, expect } from 'vitest';
-import { getPointDisplay, formatTime, getMatchDuration } from '../scoring';
+import { getPointDisplay, formatTime, getMatchDuration, checkMatchWinner, getNextServer } from '../scoring';
 
 describe('scoring utils', () => {
   describe('getPointDisplay', () => {
-    it('should return correct point display for 0-0', () => {
-      const result = getPointDisplay(0, 0);
-      expect(result).toEqual({ p1: '0', p2: '0' });
+    it('should return numeric scores', () => {
+      expect(getPointDisplay(0, 0)).toEqual({ p1: '0', p2: '0' });
+      expect(getPointDisplay(3, 2)).toEqual({ p1: '3', p2: '2' });
+      expect(getPointDisplay(7, 6)).toEqual({ p1: '7', p2: '6' });
+      expect(getPointDisplay(10, 8)).toEqual({ p1: '10', p2: '8' });
+    });
+  });
+
+  describe('checkMatchWinner', () => {
+    it('should return null when no winner yet', () => {
+      expect(checkMatchWinner(3, 2, 7)).toBeNull();
+      expect(checkMatchWinner(6, 6, 7)).toBeNull();
     });
 
-    it('should return correct point display for 15-0', () => {
-      const result = getPointDisplay(1, 0);
-      expect(result).toEqual({ p1: '15', p2: '0' });
+    it('should return winner when first to pointsToWin', () => {
+      expect(checkMatchWinner(7, 5, 7)).toBe(1);
+      expect(checkMatchWinner(5, 7, 7)).toBe(2);
+      expect(checkMatchWinner(7, 6, 7)).toBe(1);
     });
 
-    it('should return correct point display for 30-30', () => {
-      const result = getPointDisplay(2, 2);
-      expect(result).toEqual({ p1: '30', p2: '30' });
+    it('should work with different pointsToWin values', () => {
+      expect(checkMatchWinner(11, 9, 11)).toBe(1);
+      expect(checkMatchWinner(9, 11, 11)).toBe(2);
+    });
+  });
+
+  describe('getNextServer', () => {
+    it('should start with pair1-p1', () => {
+      expect(getNextServer(undefined)).toBe('pair1-p1');
     });
 
-    it('should return correct point display for 40-40 (deuce)', () => {
-      const result = getPointDisplay(3, 3);
-      expect(result).toEqual({ p1: '40', p2: '40' });
-    });
-
-    it('should return W for winner', () => {
-      const result = getPointDisplay(4, 2);
-      expect(result).toEqual({ p1: 'W', p2: '40' });
-    });
-
-    it('should return W for both when both >= 4', () => {
-      const result = getPointDisplay(5, 4);
-      expect(result).toEqual({ p1: 'W', p2: 'W' });
+    it('should rotate correctly', () => {
+      expect(getNextServer('pair1-p1')).toBe('pair2-p1');
+      expect(getNextServer('pair2-p1')).toBe('pair1-p2');
+      expect(getNextServer('pair1-p2')).toBe('pair2-p2');
+      expect(getNextServer('pair2-p2')).toBe('pair1-p1');
     });
   });
 

@@ -1,13 +1,30 @@
 export const getPointDisplay = (score1: number, score2: number): { p1: string; p2: string } => {
-  const pointMap: { [key: number]: string } = { 0: '0', 1: '15', 2: '30', 3: '40' };
+  // Simple numeric scoring - just return the scores as strings
+  return { p1: score1.toString(), p2: score2.toString() };
+};
 
-  // If both haven't reached 40 yet
-  if (score1 <= 3 && score2 <= 3) {
-    return { p1: pointMap[score1] || '40', p2: pointMap[score2] || '40' };
-  }
+export const checkMatchWinner = (score1: number, score2: number, pointsToWin: number): number | null => {
+  // First to pointsToWin wins
+  if (score1 >= pointsToWin && score1 > score2) return 1;
+  if (score2 >= pointsToWin && score2 > score1) return 2;
+  return null;
+};
 
-  // Someone has gone beyond 40
-  return { p1: score1 >= 4 ? 'W' : '40', p2: score2 >= 4 ? 'W' : '40' };
+export const getNextServer = (
+  currentServer: 'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2' | undefined
+): 'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2' => {
+  // Service rotation: pair1-p1 → pair2-p1 → pair1-p2 → pair2-p2 → pair1-p1
+  const rotation: Array<'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2'> = [
+    'pair1-p1',
+    'pair2-p1',
+    'pair1-p2',
+    'pair2-p2'
+  ];
+
+  if (!currentServer) return 'pair1-p1';
+
+  const currentIndex = rotation.indexOf(currentServer);
+  return rotation[(currentIndex + 1) % 4];
 };
 
 export const formatTime = (milliseconds: number): string => {
