@@ -353,6 +353,7 @@ const App: React.FC = () => {
           m.id === matchId ? { ...m, completed: true, endTime: Date.now() } : m
         );
         const allMatchesComplete = updatedMatches.every(m => m.completed);
+        console.log(`Match ${matchId} completed. Updated matches:`, updatedMatches);
         return {
           ...r,
           matches: updatedMatches,

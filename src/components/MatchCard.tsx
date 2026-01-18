@@ -27,6 +27,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 }) => {
   const isDisabled = match.completed && !isEditing;
 
+  // Debug log to help diagnose completion issue
+  console.log(`Match ${match.id} - completed: ${match.completed}, isEditing: ${isEditing}`);
+
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
       <div className="grid grid-cols-3 gap-4 items-center">
