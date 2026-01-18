@@ -36,7 +36,7 @@ import {
 
 // Utils
 import { generatePairs, matchPairs, findPlayersToSitOut } from './utils/pairingAlgorithm';
-import { getPointDisplay } from './utils/scoring';
+import { getPointDisplay, checkMatchWinner, getNextServer } from './utils/scoring';
 import {
   exportToPDF,
   exportToJSON,
@@ -630,7 +630,7 @@ const App: React.FC = () => {
       score2: 0,
       winner: null,
       completed: false,
-      isGoldenPoint: false
+      currentServer: 'pair1-p1'
     };
 
     updateState({
@@ -653,30 +653,19 @@ const App: React.FC = () => {
       match.score2 = Math.max(0, match.score2 + delta);
     }
 
-    // Check for golden point
-    if (match.score1 === 3 && match.score2 === 3) {
-      match.isGoldenPoint = true;
+    // Rotate server after point is scored (only on +1, not on -1)
+    if (delta === 1) {
+      match.currentServer = getNextServer(match.currentServer);
     }
 
-    // Check for winner
-    if (match.score1 >= 4 || match.score2 >= 4) {
-      if (match.isGoldenPoint) {
-        if (match.score1 > match.score2) {
-          match.winner = 1;
-        } else if (match.score2 > match.score1) {
-          match.winner = 2;
-        }
-      } else {
-        if (match.score1 >= 4 && match.score1 - match.score2 >= 2) {
-          match.winner = 1;
-        } else if (match.score2 >= 4 && match.score2 - match.score1 >= 2) {
-          match.winner = 2;
-        }
-      }
+    // Check for winner using new scoring system
+    const winner = checkMatchWinner(match.score1, match.score2, state.settings.pointsToWin);
+    if (winner) {
+      match.winner = winner;
     }
 
     updateState({ finalsMatch: match });
-  }, [state.finalsMatch, updateState]);
+  }, [state.finalsMatch, state.settings.pointsToWin, updateState]);
 
   // Complete finals
   const completeFinalsMatch = useCallback(() => {
@@ -1008,14 +997,6 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Match Display */}
                       <div className="space-y-4">
-                        {state.finalsMatch.isGoldenPoint && !state.finalsMatch.winner && (
-                          <div className="bg-gradient-to-r from-red-100 to-orange-100 p-4 rounded-lg border-2 border-red-400">
-                            <div className="text-center">
-                              <div className="text-xl font-bold text-red-700">GOLDEN POINT</div>
-                              <div className="text-sm text-red-600 mt-1">Next point wins!</div>
-                            </div>
-                          </div>
-                        )}
 
                         {/* Score Display */}
                         <div>
@@ -1234,7 +1215,9 @@ const App: React.FC = () => {
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
                 <h4 className="font-semibold text-gray-800 mb-2">Regular Rounds</h4>
                 <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li>Matches are typically played to a set number of points (configurable in settings)</li>
+                  <li><strong>First to X points wins</strong> - Default is 7 points (configurable in settings, range 3-21)</li>
+                  <li>Example: 7-6 is a valid final score (first team to 7 wins)</li>
+                  <li>Service rotates every point between teams and players</li>
                   <li>Both players in a pair earn the same points for their team's score</li>
                   <li>Rankings are based on Points Per Game (PPG) to ensure fairness regardless of how many games played</li>
                 </ul>
@@ -1244,9 +1227,8 @@ const App: React.FC = () => {
                 <h4 className="font-semibold text-gray-800 mb-2">Finals</h4>
                 <ul className="list-disc list-inside space-y-2 text-gray-700">
                   <li>Top 4 players form two pairs: 1st & 4th vs 2nd & 3rd</li>
-                  <li>Played as a single game with traditional scoring (0-15-30-40)</li>
-                  <li>First to 40 with 2-point lead wins (before deuce)</li>
-                  <li><strong>Golden Point at Deuce:</strong> When it's 40-40, the next point wins the game!</li>
+                  <li>Same scoring as regular matches - first team to reach points target wins</li>
+                  <li>Service rotates between teams and players each point</li>
                   <li>Winners are crowned as tournament champions</li>
                 </ul>
               </div>
