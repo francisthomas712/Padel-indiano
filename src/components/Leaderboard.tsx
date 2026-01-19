@@ -24,6 +24,17 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
       <div className="flex gap-2 mb-4">
         <button
+          onClick={() => onModeChange('elo')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors touch-target ${
+            mode === 'elo'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+          aria-pressed={mode === 'elo'}
+        >
+          ELO
+        </button>
+        <button
           onClick={() => onModeChange('ppg')}
           className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors touch-target ${
             mode === 'ppg'
@@ -32,7 +43,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           }`}
           aria-pressed={mode === 'ppg'}
         >
-          Points/Game
+          PPG
         </button>
         <button
           onClick={() => onModeChange('total')}
@@ -43,7 +54,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           }`}
           aria-pressed={mode === 'total'}
         >
-          Total Points
+          Points
         </button>
       </div>
 
@@ -93,23 +104,27 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                     {player.matchesPlayed} games | {player.wins}W-{player.losses}L ({player.winRate}%)
                     {player.sitOutCount > 0 && ` | ${player.sitOutCount} sit-out${player.sitOutCount > 1 ? 's' : ''}`}
                   </div>
-                  {mode === 'ppg' ? (
+                  {mode === 'elo' ? (
                     <div className="text-xs text-gray-500">
-                      {player.points} total pts
+                      {player.ppg} PPG | {player.points.toFixed(1)} pts
+                    </div>
+                  ) : mode === 'ppg' ? (
+                    <div className="text-xs text-gray-500">
+                      ELO {player.eloRating} | {player.points.toFixed(1)} pts
                     </div>
                   ) : (
                     <div className="text-xs text-gray-500">
-                      {player.ppg} pts/game
+                      ELO {player.eloRating} | {player.ppg} PPG
                     </div>
                   )}
                 </div>
               </div>
               <div className="text-right">
                 <div className={`text-2xl font-bold ${!player.active ? 'text-gray-400' : 'text-gray-800'}`}>
-                  {mode === 'ppg' ? player.ppg : player.points}
+                  {mode === 'elo' ? player.eloRating : mode === 'ppg' ? player.ppg : player.points.toFixed(1)}
                 </div>
                 <div className="text-xs text-gray-500 font-medium">
-                  {mode === 'ppg' ? 'PPG' : 'PTS'}
+                  {mode === 'elo' ? 'ELO' : mode === 'ppg' ? 'PPG' : 'PTS'}
                 </div>
               </div>
             </div>

@@ -4,7 +4,7 @@ const STORAGE_KEY = 'padel-indiano-tournament';
 const TEMPLATES_KEY = 'padel-indiano-templates';
 const HISTORY_KEY = 'padel-indiano-history';
 const VERSION_KEY = 'padel-indiano-version';
-const CURRENT_VERSION = '2.0.0'; // Increment when schema changes
+const CURRENT_VERSION = '3.0.0'; // v3.0.0: Added ELO rating system with weighted points
 
 export const saveTournamentState = (state: TournamentState): void => {
   try {

@@ -8,6 +8,8 @@ export interface Player {
   active: boolean;
   sitOutCount: number;
   avatar?: string;
+  eloRating: number;      // Current ELO rating for matchmaking and skill tracking
+  initialElo: number;     // Starting ELO rating (typically 1500)
 }
 
 export interface Pair {
@@ -87,6 +89,6 @@ export interface HistoryEntry {
   previousState?: Partial<TournamentState>;
 }
 
-export type LeaderboardMode = 'ppg' | 'total';
+export type LeaderboardMode = 'ppg' | 'total' | 'elo';
 
 export type ActiveTab = 'tournament' | 'rules' | 'history' | 'settings';

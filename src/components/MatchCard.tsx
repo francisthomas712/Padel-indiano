@@ -1,6 +1,7 @@
 import React from 'react';
 import { Match } from '../types';
 import { getMatchDuration } from '../utils/scoring';
+import { calculatePairRating, calculatePointMultiplier } from '../utils/elo';
 
 interface MatchCardProps {
   match: Match;
@@ -26,6 +27,19 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   isEditing
 }) => {
   const isDisabled = match.completed && !isEditing;
+
+  // Calculate ELO-based point multipliers
+  const pair1Elo = calculatePairRating(
+    match.pair1.players[0].eloRating,
+    match.pair1.players[1].eloRating
+  );
+  const pair2Elo = calculatePairRating(
+    match.pair2.players[0].eloRating,
+    match.pair2.players[1].eloRating
+  );
+
+  const pair1Multiplier = calculatePointMultiplier(pair1Elo, pair2Elo);
+  const pair2Multiplier = calculatePointMultiplier(pair2Elo, pair1Elo);
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -101,6 +115,38 @@ export const MatchCard: React.FC<MatchCardProps> = ({
               {player.name}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ELO Info and Point Multipliers */}
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          {/* Pair 1 Info */}
+          <div className="text-left">
+            <div className="text-gray-600">ELO: {Math.round(pair1Elo)}</div>
+            <div className={`font-semibold ${pair1Multiplier > 1.0 ? 'text-green-600' : pair1Multiplier < 1.0 ? 'text-orange-600' : 'text-gray-600'}`}>
+              {pair1Multiplier.toFixed(2)}x points
+            </div>
+          </div>
+
+          {/* Center - Match Quality Indicator */}
+          <div className="text-center text-gray-500">
+            {Math.abs(pair1Elo - pair2Elo) < 50 ? (
+              <span className="text-green-600 font-semibold">Balanced</span>
+            ) : Math.abs(pair1Elo - pair2Elo) < 150 ? (
+              <span className="text-yellow-600">Fair</span>
+            ) : (
+              <span className="text-orange-600">Unbalanced</span>
+            )}
+          </div>
+
+          {/* Pair 2 Info */}
+          <div className="text-right">
+            <div className="text-gray-600">ELO: {Math.round(pair2Elo)}</div>
+            <div className={`font-semibold ${pair2Multiplier > 1.0 ? 'text-green-600' : pair2Multiplier < 1.0 ? 'text-orange-600' : 'text-gray-600'}`}>
+              {pair2Multiplier.toFixed(2)}x points
+            </div>
+          </div>
         </div>
       </div>
 

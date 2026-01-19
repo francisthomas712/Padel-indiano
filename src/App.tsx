@@ -39,6 +39,12 @@ import {
 import { generatePairs, matchPairs, findPlayersToSitOut } from './utils/pairingAlgorithm';
 import { getPointDisplay, checkMatchWinner, getNextServer } from './utils/scoring';
 import {
+  calculatePairRating,
+  calculateWeightedPoints,
+  updateMatchElo,
+  INITIAL_ELO
+} from './utils/elo';
+import {
   exportToPDF,
   exportToJSON,
   generateTournamentReport,
@@ -113,7 +119,9 @@ const App: React.FC = () => {
       wins: 0,
       losses: 0,
       active: true,
-      sitOutCount: 0
+      sitOutCount: 0,
+      eloRating: INITIAL_ELO,
+      initialElo: INITIAL_ELO
     };
 
     updateState(
@@ -288,25 +296,53 @@ const App: React.FC = () => {
 
     if (!round || !match || match.completed) return;
 
-    // Update player stats
+    // Update player stats with ELO-weighted points
     const updatedPlayers = [...state.players];
     const pair1PlayerIds = match.pair1.players.map(p => p.id);
     const pair2PlayerIds = match.pair2.players.map(p => p.id);
 
+    // Get players for ELO calculations
+    const pair1Players = pair1PlayerIds.map(id => updatedPlayers.find(p => p.id === id)!);
+    const pair2Players = pair2PlayerIds.map(id => updatedPlayers.find(p => p.id === id)!);
+
+    // Calculate pair average ELO ratings
+    const pair1Elo = calculatePairRating(pair1Players[0].eloRating, pair1Players[1].eloRating);
+    const pair2Elo = calculatePairRating(pair2Players[0].eloRating, pair2Players[1].eloRating);
+
+    // Calculate weighted points based on opponent strength
+    const pair1WeightedPoints = calculateWeightedPoints(match.score1, pair1Elo, pair2Elo);
+    const pair2WeightedPoints = calculateWeightedPoints(match.score2, pair2Elo, pair1Elo);
+
+    // Determine winner for ELO update
+    const pair1Won = match.score1 > match.score2;
+
+    // Update ELO ratings for all players
+    const newEloRatings = updateMatchElo(
+      { id: pair1Players[0].id, rating: pair1Players[0].eloRating },
+      { id: pair1Players[1].id, rating: pair1Players[1].eloRating },
+      { id: pair2Players[0].id, rating: pair2Players[0].eloRating },
+      { id: pair2Players[1].id, rating: pair2Players[1].eloRating },
+      pair1Won
+    );
+
+    // Update pair 1 players with weighted points and new ELO
     pair1PlayerIds.forEach(playerId => {
       const player = updatedPlayers.find(p => p.id === playerId);
       if (player) {
-        player.points += match.score1;
+        player.points += pair1WeightedPoints;  // Weighted points instead of raw score
+        player.eloRating = newEloRatings[playerId];
         player.matchesPlayed += 1;
         if (match.score1 > match.score2) player.wins += 1;
         else if (match.score1 < match.score2) player.losses += 1;
       }
     });
 
+    // Update pair 2 players with weighted points and new ELO
     pair2PlayerIds.forEach(playerId => {
       const player = updatedPlayers.find(p => p.id === playerId);
       if (player) {
-        player.points += match.score2;
+        player.points += pair2WeightedPoints;  // Weighted points instead of raw score
+        player.eloRating = newEloRatings[playerId];
         player.matchesPlayed += 1;
         if (match.score2 > match.score1) player.wins += 1;
         else if (match.score2 < match.score1) player.losses += 1;
@@ -869,7 +905,9 @@ const App: React.FC = () => {
       wins: 0,
       losses: 0,
       active: true,
-      sitOutCount: 0
+      sitOutCount: 0,
+      eloRating: INITIAL_ELO,
+      initialElo: INITIAL_ELO
     }));
 
     updateState({

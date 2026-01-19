@@ -1,27 +1,27 @@
 import { Player, Pair, Match, PartnershipHistory, OppositionHistory } from '../types';
 
 export const getPlayerSkill = (player: Player): number => {
-  if (player.matchesPlayed === 0) return 0;
-  return player.points / player.matchesPlayed;
+  // Use ELO rating as primary skill metric
+  // This provides more accurate skill assessment than PPG
+  return player.eloRating;
 };
 
 /**
- * Improved pairing algorithm using a greedy approach with better scoring
- * For optimal results, we'd use Hungarian algorithm, but this provides good results
- * with much better performance for small tournament sizes
+ * Improved pairing algorithm using ELO-based skill assessment with greedy approach
+ * Players are sorted by ELO rating and paired to maximize variety and balance
  */
 export const generatePairs = (
   activePlayers: Player[],
   partnershipHistory: PartnershipHistory
 ): Pair[] => {
-  // Sort players by skill level
+  // Sort players by ELO rating (higher ELO = better player)
   const sortedPlayers = [...activePlayers].sort((a, b) => {
-    const skillA = getPlayerSkill(a);
-    const skillB = getPlayerSkill(b);
-    if (Math.abs(skillA - skillB) < 0.01) {
-      return Math.random() - 0.5; // Add randomness for similar skills
+    const eloA = a.eloRating;
+    const eloB = b.eloRating;
+    if (Math.abs(eloA - eloB) < 10) {
+      return Math.random() - 0.5; // Add randomness for similar ELO
     }
-    return skillB - skillA;
+    return eloB - eloA;
   });
 
   const pairs: Pair[] = [];
