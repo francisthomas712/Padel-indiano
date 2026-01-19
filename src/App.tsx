@@ -400,8 +400,9 @@ const App: React.FC = () => {
     const pair2Elo = calculatePairRating(pair2Players[0].eloRating, pair2Players[1].eloRating);
 
     // Calculate weighted points based on opponent strength
-    const pair1WeightedPoints = calculateWeightedPoints(match.score1, pair1Elo, pair2Elo);
-    const pair2WeightedPoints = calculateWeightedPoints(match.score2, pair2Elo, pair1Elo);
+    // Round to 1 decimal place to match display precision and ensure accurate PPG calculations
+    const pair1WeightedPoints = Math.round(calculateWeightedPoints(match.score1, pair1Elo, pair2Elo) * 10) / 10;
+    const pair2WeightedPoints = Math.round(calculateWeightedPoints(match.score2, pair2Elo, pair1Elo) * 10) / 10;
 
     // Determine winner for ELO update
     const pair1Won = match.score1 > match.score2;
@@ -473,11 +474,17 @@ const App: React.FC = () => {
       });
     });
 
-    // Mark match as completed
+    // Mark match as completed and store weighted points for accurate reversal
     const updatedRounds = state.rounds.map(r => {
       if (r.id === roundId) {
         const updatedMatches = r.matches.map(m =>
-          m.id === matchId ? { ...m, completed: true, endTime: Date.now() } : m
+          m.id === matchId ? {
+            ...m,
+            completed: true,
+            endTime: Date.now(),
+            weightedPoints1: pair1WeightedPoints,
+            weightedPoints2: pair2WeightedPoints
+          } : m
         );
         const allMatchesComplete = updatedMatches.every(m => m.completed);
         return {
@@ -518,10 +525,14 @@ const App: React.FC = () => {
     const pair1PlayerIds = match.pair1.players.map(p => p.id);
     const pair2PlayerIds = match.pair2.players.map(p => p.id);
 
+    // Use stored weighted points if available, otherwise fall back to raw scores
+    const points1 = match.weightedPoints1 ?? match.score1;
+    const points2 = match.weightedPoints2 ?? match.score2;
+
     pair1PlayerIds.forEach(playerId => {
       const player = updatedPlayers.find(p => p.id === playerId);
       if (player) {
-        player.points -= match.score1;
+        player.points -= points1;
         player.matchesPlayed -= 1;
         if (match.score1 > match.score2) player.wins -= 1;
         else if (match.score1 < match.score2) player.losses -= 1;
@@ -531,7 +542,7 @@ const App: React.FC = () => {
     pair2PlayerIds.forEach(playerId => {
       const player = updatedPlayers.find(p => p.id === playerId);
       if (player) {
-        player.points -= match.score2;
+        player.points -= points2;
         player.matchesPlayed -= 1;
         if (match.score2 > match.score1) player.wins -= 1;
         else if (match.score2 < match.score1) player.losses -= 1;
@@ -619,10 +630,14 @@ const App: React.FC = () => {
       const pair1PlayerIds = match.pair1.players.map(p => p.id);
       const pair2PlayerIds = match.pair2.players.map(p => p.id);
 
+      // Use stored weighted points if available, otherwise fall back to raw scores
+      const points1 = match.weightedPoints1 ?? match.score1;
+      const points2 = match.weightedPoints2 ?? match.score2;
+
       pair1PlayerIds.forEach(playerId => {
         const player = updatedPlayers.find(p => p.id === playerId);
         if (player) {
-          player.points -= match.score1;
+          player.points -= points1;
           player.matchesPlayed -= 1;
           if (match.score1 > match.score2) player.wins -= 1;
           else if (match.score1 < match.score2) player.losses -= 1;
@@ -632,7 +647,7 @@ const App: React.FC = () => {
       pair2PlayerIds.forEach(playerId => {
         const player = updatedPlayers.find(p => p.id === playerId);
         if (player) {
-          player.points -= match.score2;
+          player.points -= points2;
           player.matchesPlayed -= 1;
           if (match.score2 > match.score1) player.wins -= 1;
           else if (match.score2 < match.score1) player.losses -= 1;
@@ -717,11 +732,15 @@ const App: React.FC = () => {
         const pair1PlayerIds = match.pair1.players.map(p => p.id);
         const pair2PlayerIds = match.pair2.players.map(p => p.id);
 
+        // Use stored weighted points if available, otherwise fall back to raw scores
+        const points1 = match.weightedPoints1 ?? match.score1;
+        const points2 = match.weightedPoints2 ?? match.score2;
+
         // Reverse player stats
         pair1PlayerIds.forEach(playerId => {
           const player = updatedPlayers.find(p => p.id === playerId);
           if (player) {
-            player.points -= match.score1;
+            player.points -= points1;
             player.matchesPlayed -= 1;
             if (match.score1 > match.score2) player.wins -= 1;
             else if (match.score1 < match.score2) player.losses -= 1;
@@ -731,7 +750,7 @@ const App: React.FC = () => {
         pair2PlayerIds.forEach(playerId => {
           const player = updatedPlayers.find(p => p.id === playerId);
           if (player) {
-            player.points -= match.score2;
+            player.points -= points2;
             player.matchesPlayed -= 1;
             if (match.score2 > match.score1) player.wins -= 1;
             else if (match.score2 < match.score1) player.losses -= 1;

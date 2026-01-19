@@ -25,6 +25,8 @@ export interface Match {
   pair2: Pair;
   score1: number;
   score2: number;
+  weightedPoints1?: number;  // Weighted points for pair 1 (for accurate reversal)
+  weightedPoints2?: number;  // Weighted points for pair 2 (for accurate reversal)
   completed: boolean;
   startTime?: number;
   endTime?: number;
