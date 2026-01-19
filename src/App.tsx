@@ -78,6 +78,7 @@ const App: React.FC = () => {
 
   // Local UI state
   const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerElo, setNewPlayerElo] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('tournament');
   const [leaderboardMode, setLeaderboardMode] = useState<LeaderboardMode>('ppg');
   const [editingMatch, setEditingMatch] = useState<EditingMatch | null>(null);
@@ -118,6 +119,17 @@ const App: React.FC = () => {
       return;
     }
 
+    // Parse optional ELO rating
+    let customElo = INITIAL_ELO;
+    if (newPlayerElo.trim()) {
+      const parsedElo = parseInt(newPlayerElo.trim(), 10);
+      if (isNaN(parsedElo) || parsedElo < 100 || parsedElo > 3000) {
+        toast.error('ELO rating must be between 100 and 3000');
+        return;
+      }
+      customElo = parsedElo;
+    }
+
     const newPlayer: Player = {
       id: Date.now().toString(),
       name: newPlayerName.trim(),
@@ -127,8 +139,8 @@ const App: React.FC = () => {
       losses: 0,
       active: true,
       sitOutCount: 0,
-      eloRating: INITIAL_ELO,
-      initialElo: INITIAL_ELO
+      eloRating: customElo,
+      initialElo: customElo
     };
 
     updateState(
@@ -141,9 +153,10 @@ const App: React.FC = () => {
     );
 
     setNewPlayerName('');
+    setNewPlayerElo('');
     initializePlayerHistory(newPlayer.id);
-    toast.success(`Added ${newPlayer.name}`);
-  }, [newPlayerName, state.players, updateState, initializePlayerHistory]);
+    toast.success(`Added ${newPlayer.name}${customElo !== INITIAL_ELO ? ` (ELO: ${customElo})` : ''}`);
+  }, [newPlayerName, newPlayerElo, state.players, updateState, initializePlayerHistory]);
 
   // Remove a player (only before tournament starts)
   const removePlayer = useCallback((playerId: string) => {
@@ -1095,7 +1108,9 @@ const App: React.FC = () => {
               <PlayerList
                 players={state.players}
                 newPlayerName={newPlayerName}
+                newPlayerElo={newPlayerElo}
                 onNewPlayerNameChange={setNewPlayerName}
+                onNewPlayerEloChange={setNewPlayerElo}
                 onAddPlayer={addPlayer}
                 onRemovePlayer={removePlayer}
                 onToggleActive={togglePlayerActive}
@@ -1185,6 +1200,8 @@ const App: React.FC = () => {
 
               {/* Finals Match */}
               {state.finalsMode && state.finalsMatch && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
                 <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -1214,8 +1231,14 @@ const App: React.FC = () => {
 
                           <div className="flex items-center justify-between p-6 bg-blue-50 rounded-lg border-2 border-blue-300 mb-3">
                             <div>
-                              <div className="font-bold text-xl text-gray-800">{state.finalsMatch.pair1.players[0].name}</div>
-                              <div className="font-bold text-xl text-gray-800">{state.finalsMatch.pair1.players[1].name}</div>
+                              <div className="font-bold text-xl text-gray-800">
+                                {state.finalsMatch.pair1.players[0].name}
+                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair1.players[0].eloRating})</span>
+                              </div>
+                              <div className="font-bold text-xl text-gray-800">
+                                {state.finalsMatch.pair1.players[1].name}
+                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair1.players[1].eloRating})</span>
+                              </div>
                             </div>
                             <div className="text-6xl font-bold text-blue-600">
                               {getPointDisplay(state.finalsMatch.score1, state.finalsMatch.score2).p1}
@@ -1226,8 +1249,14 @@ const App: React.FC = () => {
 
                           <div className="flex items-center justify-between p-6 bg-orange-50 rounded-lg border-2 border-orange-300">
                             <div>
-                              <div className="font-bold text-xl text-gray-800">{state.finalsMatch.pair2.players[0].name}</div>
-                              <div className="font-bold text-xl text-gray-800">{state.finalsMatch.pair2.players[1].name}</div>
+                              <div className="font-bold text-xl text-gray-800">
+                                {state.finalsMatch.pair2.players[0].name}
+                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair2.players[0].eloRating})</span>
+                              </div>
+                              <div className="font-bold text-xl text-gray-800">
+                                {state.finalsMatch.pair2.players[1].name}
+                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair2.players[1].eloRating})</span>
+                              </div>
                             </div>
                             <div className="text-6xl font-bold text-orange-600">
                               {getPointDisplay(state.finalsMatch.score1, state.finalsMatch.score2).p2}
@@ -1329,6 +1358,17 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   )}
+                </div>
+                  </div>
+
+                  {/* Leaderboard - Always visible during finals */}
+                  <div className="lg:col-span-1">
+                    <Leaderboard
+                      leaderboard={getLeaderboard()}
+                      mode={leaderboardMode}
+                      onModeChange={setLeaderboardMode}
+                    />
+                  </div>
                 </div>
               )}
 

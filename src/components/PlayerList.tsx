@@ -5,7 +5,9 @@ import { Player } from '../types';
 interface PlayerListProps {
   players: Player[];
   newPlayerName: string;
+  newPlayerElo: string;
   onNewPlayerNameChange: (name: string) => void;
+  onNewPlayerEloChange: (elo: string) => void;
   onAddPlayer: () => void;
   onRemovePlayer: (playerId: string) => void;
   onToggleActive: (playerId: string) => void;
@@ -15,7 +17,9 @@ interface PlayerListProps {
 export const PlayerList: React.FC<PlayerListProps> = ({
   players,
   newPlayerName,
+  newPlayerElo,
   onNewPlayerNameChange,
+  onNewPlayerEloChange,
   onAddPlayer,
   onRemovePlayer,
   onToggleActive,
@@ -34,24 +38,40 @@ export const PlayerList: React.FC<PlayerListProps> = ({
         Players ({players.filter(p => p.active).length} active)
       </h2>
 
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={newPlayerName}
-          onChange={(e) => onNewPlayerNameChange(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Enter player name"
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 touch-target"
-          aria-label="New player name"
-        />
-        <button
-          onClick={onAddPlayer}
-          className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 transition-colors touch-target"
-          aria-label="Add player"
+      <div className="space-y-2 mb-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newPlayerName}
+            onChange={(e) => onNewPlayerNameChange(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Enter player name"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 touch-target"
+            aria-label="New player name"
+          />
+          <input
+            type="number"
+            value={newPlayerElo}
+            onChange={(e) => onNewPlayerEloChange(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="ELO (optional, default 1500)"
+            min="100"
+            max="3000"
+            className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 touch-target"
+            aria-label="Initial ELO rating (optional)"
+          />
+          <button
+            onClick={onAddPlayer}
+            className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 transition-colors touch-target"
+            aria-label="Add player"
         >
           <Plus className="w-4 h-4" />
           Add
         </button>
+        </div>
+        <p className="text-xs text-gray-500 px-1">
+          Optional: Set custom starting ELO (100-3000). Leave blank for default 1500.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
