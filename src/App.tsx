@@ -1074,20 +1074,20 @@ const App: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <Toaster position="top-right" />
 
       <div className="max-w-7xl mx-auto" id="tournament-container">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl p-8 mb-6 border border-slate-700">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-500 rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
                 <Trophy className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Padel Indiano</h1>
-                <p className="text-gray-600">Dynamic skill-based pairing</p>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Padel Indiano</h1>
+                <p className="text-slate-400 text-sm font-medium">Dynamic skill-based tournament system</p>
               </div>
             </div>
 
@@ -1096,7 +1096,7 @@ const App: React.FC = () => {
               <button
                 onClick={undo}
                 disabled={!canUndo}
-                className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-lg"
                 title="Undo (Ctrl+Z)"
               >
                 <Undo className="w-5 h-5" />
@@ -1104,7 +1104,7 @@ const App: React.FC = () => {
               <button
                 onClick={redo}
                 disabled={!canRedo}
-                className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-lg"
                 title="Redo (Ctrl+Shift+Z)"
               >
                 <Redo className="w-5 h-5" />
@@ -1113,15 +1113,15 @@ const App: React.FC = () => {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex gap-2 mb-6 border-b border-gray-200 flex-wrap">
+          <div className="flex gap-2 mb-8 border-b border-slate-700 flex-wrap">
             {(['tournament', 'rules', 'history', 'settings'] as ActiveTab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 font-semibold transition-colors capitalize ${
+                className={`px-6 py-3 font-semibold transition-all capitalize ${
                   activeTab === tab
-                    ? 'text-green-600 border-b-2 border-green-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-emerald-400 border-b-2 border-emerald-400 shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-slate-200 hover:border-b-2 hover:border-slate-600'
                 }`}
               >
                 {tab}
@@ -1150,14 +1150,14 @@ const App: React.FC = () => {
                 <div className="flex gap-3 mb-6">
                   <button
                     onClick={startTournament}
-                    className="flex-1 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 font-semibold transition-colors"
+                    className="flex-1 py-3 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 font-semibold transition-colors"
                   >
                     <Play className="w-5 h-5" />
                     Start Tournament
                   </button>
                   <button
                     onClick={() => setShowTemplateModal(true)}
-                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 font-semibold transition-colors"
+                    className="px-6 py-3 bg-slate-700/300 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 font-semibold transition-colors"
                     title="Save as template (Ctrl+S)"
                   >
                     <Save className="w-5 h-5" />
@@ -1170,7 +1170,7 @@ const App: React.FC = () => {
                   <div className="flex gap-3 flex-wrap">
                     <button
                       onClick={generateNextRound}
-                      className="flex-1 min-w-[200px] py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-2 font-semibold transition-colors"
+                      className="flex-1 min-w-[200px] py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 flex items-center justify-center gap-2 font-semibold transition-all shadow-lg hover:shadow-emerald-500/50"
                     >
                       <PlusCircle className="w-5 h-5" />
                       Generate Next Round
@@ -1178,14 +1178,14 @@ const App: React.FC = () => {
                     <button
                       onClick={initiateFinals}
                       disabled={getLeaderboard().length < 4}
-                      className="flex-1 min-w-[200px] py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
+                      className="flex-1 min-w-[200px] py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-all shadow-lg hover:shadow-yellow-500/50 disabled:shadow-none"
                     >
                       <Trophy className="w-5 h-5" />
                       Initiate Finals
                     </button>
                     <button
                       onClick={resetTournament}
-                      className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center justify-center gap-2 font-semibold transition-colors"
+                      className="px-6 py-3 bg-slate-600 text-white rounded-lg hover:bg-slate-500 flex items-center justify-center gap-2 font-semibold transition-all shadow-lg"
                     >
                       <RotateCcw className="w-5 h-5" />
                       Reset
@@ -1196,28 +1196,28 @@ const App: React.FC = () => {
                   <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={handleExportPDF}
-                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 text-sm transition-colors"
+                      className="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-red-500 flex items-center gap-2 text-sm transition-all"
                     >
                       <Download className="w-4 h-4" />
                       Export PDF
                     </button>
                     <button
                       onClick={handleExportJSON}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 text-sm transition-colors"
+                      className="px-4 py-2 bg-blue-500/100/80 text-white rounded-lg hover:bg-blue-500/100 flex items-center gap-2 text-sm transition-all"
                     >
                       <Download className="w-4 h-4" />
                       Export JSON
                     </button>
                     <button
                       onClick={handleExportReport}
-                      className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2 text-sm transition-colors"
+                      className="px-4 py-2 bg-purple-500/100/80 text-white rounded-lg hover:bg-purple-500/100 flex items-center gap-2 text-sm transition-all"
                     >
                       <FileText className="w-4 h-4" />
                       Text Report
                     </button>
                     <button
                       onClick={handleShare}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 text-sm transition-colors"
+                      className="px-4 py-2 bg-emerald-500/80 text-white rounded-lg hover:bg-emerald-500 flex items-center gap-2 text-sm transition-all"
                     >
                       <Share2 className="w-4 h-4" />
                       Share
@@ -1230,19 +1230,19 @@ const App: React.FC = () => {
               {state.finalsMode && state.finalsMatch && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2">
-                <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+                <div className="bg-slate-800/50 rounded-2xl shadow-2xl border border-slate-700 p-6 mb-6">
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                    <h2 className="text-3xl font-bold text-slate-100 flex items-center gap-2">
                       <Trophy className="w-8 h-8 text-yellow-500" />
                       FINALS - Single Game
                     </h2>
                     {state.finalsMatch.winner && !state.finalsMatch.completed && (
-                      <span className="px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full font-semibold">
+                      <span className="px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-full font-semibold">
                         Game Complete - Click "Complete Match"
                       </span>
                     )}
                     {state.finalsMatch.completed && (
-                      <span className="px-4 py-2 bg-green-100 text-green-700 rounded-full font-semibold">
+                      <span className="px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full font-semibold">
                         Match Complete
                       </span>
                     )}
@@ -1255,17 +1255,17 @@ const App: React.FC = () => {
 
                         {/* Score Display */}
                         <div>
-                          <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">SCORE</h3>
+                          <h3 className="text-sm font-semibold text-slate-400 mb-3 text-center">SCORE</h3>
 
-                          <div className="flex items-center justify-between p-6 bg-blue-50 rounded-lg border-2 border-blue-300 mb-3">
+                          <div className="flex items-center justify-between p-6 bg-blue-500/10 rounded-lg border-2 border-blue-300 mb-3">
                             <div>
-                              <div className="font-bold text-xl text-gray-800">
+                              <div className="font-bold text-xl text-slate-200">
                                 {state.finalsMatch.pair1.players[0].name}
-                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair1.players[0].eloRating})</span>
+                                <span className="text-sm text-slate-400 ml-2">(ELO {state.finalsMatch.pair1.players[0].eloRating})</span>
                               </div>
-                              <div className="font-bold text-xl text-gray-800">
+                              <div className="font-bold text-xl text-slate-200">
                                 {state.finalsMatch.pair1.players[1].name}
-                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair1.players[1].eloRating})</span>
+                                <span className="text-sm text-slate-400 ml-2">(ELO {state.finalsMatch.pair1.players[1].eloRating})</span>
                               </div>
                             </div>
                             <div className="text-6xl font-bold text-blue-600">
@@ -1275,15 +1275,15 @@ const App: React.FC = () => {
 
                           <div className="text-center text-2xl font-bold text-gray-400 my-2">VS</div>
 
-                          <div className="flex items-center justify-between p-6 bg-orange-50 rounded-lg border-2 border-orange-300">
+                          <div className="flex items-center justify-between p-6 bg-orange-500/10 rounded-lg border-2 border-orange-300">
                             <div>
-                              <div className="font-bold text-xl text-gray-800">
+                              <div className="font-bold text-xl text-slate-200">
                                 {state.finalsMatch.pair2.players[0].name}
-                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair2.players[0].eloRating})</span>
+                                <span className="text-sm text-slate-400 ml-2">(ELO {state.finalsMatch.pair2.players[0].eloRating})</span>
                               </div>
-                              <div className="font-bold text-xl text-gray-800">
+                              <div className="font-bold text-xl text-slate-200">
                                 {state.finalsMatch.pair2.players[1].name}
-                                <span className="text-sm text-gray-600 ml-2">(ELO {state.finalsMatch.pair2.players[1].eloRating})</span>
+                                <span className="text-sm text-slate-400 ml-2">(ELO {state.finalsMatch.pair2.players[1].eloRating})</span>
                               </div>
                             </div>
                             <div className="text-6xl font-bold text-orange-600">
@@ -1306,40 +1306,40 @@ const App: React.FC = () => {
 
                       {/* Scoring Controls */}
                       <div className="space-y-4">
-                        <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                          <h4 className="font-semibold text-gray-800 mb-4 text-center text-lg">Pair 1 Score</h4>
+                        <div className="bg-blue-500/10 p-6 rounded-lg border border-blue-200">
+                          <h4 className="font-semibold text-slate-200 mb-4 text-center text-lg">Pair 1 Score</h4>
                           <div className="flex gap-3 justify-center">
                             <button
                               onClick={() => updateFinalsScore(1, 1)}
                               disabled={!!state.finalsMatch.winner}
-                              className="px-8 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
+                              className="px-8 py-4 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
                             >
                               + Point
                             </button>
                             <button
                               onClick={() => updateFinalsScore(1, -1)}
                               disabled={!!state.finalsMatch.winner}
-                              className="px-8 py-4 bg-gray-400 text-white rounded-lg hover:bg-gray-500 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
+                              className="px-8 py-4 bg-gray-400 text-white rounded-lg hover:bg-slate-700/300 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
                             >
                               - Point
                             </button>
                           </div>
                         </div>
 
-                        <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
-                          <h4 className="font-semibold text-gray-800 mb-4 text-center text-lg">Pair 2 Score</h4>
+                        <div className="bg-orange-500/10 p-6 rounded-lg border border-orange-200">
+                          <h4 className="font-semibold text-slate-200 mb-4 text-center text-lg">Pair 2 Score</h4>
                           <div className="flex gap-3 justify-center">
                             <button
                               onClick={() => updateFinalsScore(2, 1)}
                               disabled={!!state.finalsMatch.winner}
-                              className="px-8 py-4 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
+                              className="px-8 py-4 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
                             >
                               + Point
                             </button>
                             <button
                               onClick={() => updateFinalsScore(2, -1)}
                               disabled={!!state.finalsMatch.winner}
-                              className="px-8 py-4 bg-gray-400 text-white rounded-lg hover:bg-gray-500 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
+                              className="px-8 py-4 bg-gray-400 text-white rounded-lg hover:bg-slate-700/300 disabled:bg-gray-300 disabled:cursor-not-allowed font-bold text-lg transition-colors"
                             >
                               - Point
                             </button>
@@ -1349,7 +1349,7 @@ const App: React.FC = () => {
                         {state.finalsMatch.winner && (
                           <button
                             onClick={completeFinalsMatch}
-                            className="w-full py-4 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold text-lg transition-colors flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 font-bold text-lg transition-colors flex items-center justify-center gap-2"
                           >
                             <Trophy className="w-5 h-5" />
                             Complete Match & Crown Champions
@@ -1364,7 +1364,7 @@ const App: React.FC = () => {
                     <div className="bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 p-8 rounded-2xl border-4 border-yellow-400">
                       <div className="text-center mb-6">
                         <div className="text-5xl mb-4">🏆</div>
-                        <h2 className="text-4xl font-bold text-gray-800 mb-2">TOURNAMENT CHAMPIONS</h2>
+                        <h2 className="text-4xl font-bold text-slate-200 mb-2">TOURNAMENT CHAMPIONS</h2>
                         <div className="h-1 w-32 bg-yellow-400 mx-auto rounded"></div>
                       </div>
 
@@ -1405,25 +1405,25 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2 space-y-6">
                     {state.rounds.map((round, idx) => (
-                      <div key={round.id} className="bg-white rounded-2xl shadow-xl p-6">
+                      <div key={round.id} className="bg-slate-800/50 rounded-2xl shadow-2xl border border-slate-700 p-6">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <h3 className="text-2xl font-bold text-gray-800">Round {idx + 1}</h3>
+                            <h3 className="text-2xl font-bold text-slate-100">Round {idx + 1}</h3>
                             {round.sittingOut && (
-                              <p className="text-sm text-orange-600 mt-1">
+                              <p className="text-sm text-orange-400 mt-1">
                                 Sitting out: {round.sittingOut.name}
                               </p>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
                             {round.completed && (
-                              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-sm font-medium">
                                 Completed
                               </span>
                             )}
                             <button
                               onClick={() => deleteRound(round.id)}
-                              className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                              className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-lg transition-colors text-sm font-medium"
                               title="Delete this round"
                             >
                               Delete Round
@@ -1451,10 +1451,10 @@ const App: React.FC = () => {
                     ))}
 
                     {/* Generate Round Buttons */}
-                    <div className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
+                    <div className="bg-slate-800/50 rounded-2xl shadow-2xl border border-slate-700 p-6 space-y-4">
                       <button
                         onClick={generateNextRound}
-                        className="w-full py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold text-lg transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 font-bold shadow-lg hover:shadow-emerald-500/50 text-lg transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
                         Generate Next Round
@@ -1462,7 +1462,7 @@ const App: React.FC = () => {
 
                       <button
                         onClick={() => setShowCustomRound(!showCustomRound)}
-                        className="w-full py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 shadow-lg hover:shadow-purple-500/50 font-semibold transition-colors flex items-center justify-center gap-2"
                       >
                         <PlusCircle className="w-5 h-5" />
                         {showCustomRound ? 'Cancel Custom Round' : 'Generate Custom Round'}
@@ -1471,17 +1471,17 @@ const App: React.FC = () => {
                       {/* Custom Round Player Selection */}
                       {showCustomRound && (
                         <div className="border-t pt-4 space-y-4">
-                          <h4 className="font-bold text-gray-800">Select Players for Custom Round</h4>
-                          <p className="text-sm text-gray-600">Team 1: Player 1 + Player 2 vs Team 2: Player 3 + Player 4</p>
+                          <h4 className="font-bold text-slate-200">Select Players for Custom Round</h4>
+                          <p className="text-sm text-slate-400">Team 1: Player 1 + Player 2 vs Team 2: Player 3 + Player 4</p>
 
                           <div className="grid grid-cols-2 gap-3">
                             {/* Team 1 */}
                             <div className="space-y-2">
-                              <label className="text-sm font-semibold text-gray-700">Team 1 - Player 1</label>
+                              <label className="text-sm font-semibold text-slate-300">Team 1 - Player 1</label>
                               <select
                                 value={customPlayer1}
                                 onChange={(e) => setCustomPlayer1(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-full px-3 py-2 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                               >
                                 <option value="">Select player...</option>
                                 {state.players.filter(p => p.active).map(player => (
@@ -1493,11 +1493,11 @@ const App: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                              <label className="text-sm font-semibold text-gray-700">Team 1 - Player 2</label>
+                              <label className="text-sm font-semibold text-slate-300">Team 1 - Player 2</label>
                               <select
                                 value={customPlayer2}
                                 onChange={(e) => setCustomPlayer2(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-full px-3 py-2 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                               >
                                 <option value="">Select player...</option>
                                 {state.players.filter(p => p.active).map(player => (
@@ -1510,11 +1510,11 @@ const App: React.FC = () => {
 
                             {/* Team 2 */}
                             <div className="space-y-2">
-                              <label className="text-sm font-semibold text-gray-700">Team 2 - Player 3</label>
+                              <label className="text-sm font-semibold text-slate-300">Team 2 - Player 3</label>
                               <select
                                 value={customPlayer3}
                                 onChange={(e) => setCustomPlayer3(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-full px-3 py-2 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                               >
                                 <option value="">Select player...</option>
                                 {state.players.filter(p => p.active).map(player => (
@@ -1526,11 +1526,11 @@ const App: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                              <label className="text-sm font-semibold text-gray-700">Team 2 - Player 4</label>
+                              <label className="text-sm font-semibold text-slate-300">Team 2 - Player 4</label>
                               <select
                                 value={customPlayer4}
                                 onChange={(e) => setCustomPlayer4(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-full px-3 py-2 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                               >
                                 <option value="">Select player...</option>
                                 {state.players.filter(p => p.active).map(player => (
@@ -1544,7 +1544,7 @@ const App: React.FC = () => {
 
                           <button
                             onClick={generateCustomRound}
-                            className="w-full py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold transition-colors"
+                            className="w-full py-3 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 font-bold transition-colors"
                           >
                             Create Custom Match
                           </button>
@@ -1569,41 +1569,41 @@ const App: React.FC = () => {
           {/* Rules Tab */}
           {activeTab === 'rules' && (
             <div className="prose max-w-none">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">What is Padel Indiano?</h2>
+              <h2 className="text-2xl font-bold text-slate-100 mb-4">What is Padel Indiano?</h2>
 
-              <p className="text-gray-700 mb-4">
+              <p className="text-slate-300 mb-4">
                 Padel Indiano is a dynamic tournament format where players are continuously re-paired based on their performance. Unlike traditional formats where you play with the same partner throughout, Indiano ensures everyone plays with different partners, creating a fair and social experience.
               </p>
 
-              <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6">How It Works</h3>
+              <h3 className="text-xl font-semibold text-slate-100 mb-3 mt-6">How It Works</h3>
 
-              <div className="space-y-4 text-gray-700">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">1. Dynamic Pairing</h4>
+              <div className="space-y-4 text-slate-300">
+                <div className="bg-blue-500/10 p-4 rounded-lg">
+                  <h4 className="font-semibold text-slate-200 mb-2">1. Dynamic Pairing</h4>
                   <p>Players are automatically paired each round based on their current skill level (Points Per Game). Similar-skilled players team up together, and pairs of similar combined strength play against each other.</p>
                 </div>
 
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">2. Skill-Based Matching</h4>
+                <div className="bg-emerald-500/10 p-4 rounded-lg">
+                  <h4 className="font-semibold text-slate-200 mb-2">2. Skill-Based Matching</h4>
                   <p>The algorithm ensures competitive matches by pairing players of similar abilities while maximizing variety - you'll play with as many different partners as possible.</p>
                 </div>
 
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">3. Manual Round Generation</h4>
+                <div className="bg-purple-500/10 p-4 rounded-lg">
+                  <h4 className="font-semibold text-slate-200 mb-2">3. Manual Round Generation</h4>
                   <p>Click "Generate Next Round" to create new pairings based on updated standings. You can also delete entire rounds if you want to redo the matchups.</p>
                 </div>
 
-                <div className="bg-orange-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">4. Fair Play Time</h4>
+                <div className="bg-orange-500/10 p-4 rounded-lg">
+                  <h4 className="font-semibold text-slate-200 mb-2">4. Fair Play Time</h4>
                   <p>With odd numbers of players, the system rotates who sits out to ensure everyone gets approximately equal court time.</p>
                 </div>
               </div>
 
-              <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6">Scoring</h3>
+              <h3 className="text-xl font-semibold text-slate-100 mb-3 mt-6">Scoring</h3>
 
-              <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                <h4 className="font-semibold text-gray-800 mb-2">Regular Rounds</h4>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
+              <div className="bg-slate-700/30 p-4 rounded-lg mb-4">
+                <h4 className="font-semibold text-slate-200 mb-2">Regular Rounds</h4>
+                <ul className="list-disc list-inside space-y-2 text-slate-300">
                   <li><strong>First to X points wins</strong> - Default is 7 points (configurable in settings, range 3-21)</li>
                   <li>Example: 7-6 is a valid final score (first team to 7 wins)</li>
                   <li>Service rotates every point between teams and players</li>
@@ -1613,8 +1613,8 @@ const App: React.FC = () => {
               </div>
 
               <div className="bg-yellow-50 p-4 rounded-lg mb-4">
-                <h4 className="font-semibold text-gray-800 mb-2">Finals</h4>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                <h4 className="font-semibold text-slate-200 mb-2">Finals</h4>
+                <ul className="list-disc list-inside space-y-2 text-slate-300">
                   <li>Top 4 players form two pairs: 1st & 4th vs 2nd & 3rd</li>
                   <li>Same scoring as regular matches - first team to reach points target wins</li>
                   <li>Service rotates between teams and players each point</li>
@@ -1623,8 +1623,8 @@ const App: React.FC = () => {
               </div>
 
               <div className="bg-green-100 border-l-4 border-green-500 p-4 mt-6">
-                <p className="font-semibold text-gray-800 mb-2">Pro Tip</p>
-                <p className="text-gray-700">Indiano format is perfect for social play! Everyone gets to partner with different players, skill levels balance naturally, and the competition stays exciting throughout.</p>
+                <p className="font-semibold text-slate-200 mb-2">Pro Tip</p>
+                <p className="text-slate-300">Indiano format is perfect for social play! Everyone gets to partner with different players, skill levels balance naturally, and the competition stays exciting throughout.</p>
               </div>
             </div>
           )}
@@ -1632,10 +1632,10 @@ const App: React.FC = () => {
           {/* History Tab */}
           {activeTab === 'history' && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Tournament History</h2>
+              <h2 className="text-2xl font-bold text-slate-100 mb-4">Tournament History</h2>
 
               {history.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-slate-400">
                   No history yet. Actions will appear here as you manage the tournament.
                 </div>
               ) : (
@@ -1644,10 +1644,10 @@ const App: React.FC = () => {
                     <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="font-semibold text-gray-800 capitalize">
+                          <span className="font-semibold text-slate-200 capitalize">
                             {entry.type.replace('_', ' ')}
                           </span>
-                          <span className="text-sm text-gray-500 ml-2">
+                          <span className="text-sm text-slate-400 ml-2">
                             {new Date(entry.timestamp).toLocaleString()}
                           </span>
                         </div>
@@ -1669,33 +1669,33 @@ const App: React.FC = () => {
               />
 
               {/* Template Management */}
-              <div className="bg-white rounded-lg p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Templates</h3>
+              <div className="bg-slate-800 rounded-lg p-6">
+                <h3 className="text-xl font-bold text-slate-200 mb-4">Templates</h3>
 
                 <button
                   onClick={() => setShowTemplateModal(true)}
-                  className="w-full py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-2 font-semibold mb-4"
+                  className="w-full py-3 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-2 font-semibold mb-4"
                 >
                   <Save className="w-5 h-5" />
                   Save Current Setup as Template
                 </button>
 
                 {templates.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No templates saved yet</p>
+                  <p className="text-slate-400 text-center py-4">No templates saved yet</p>
                 ) : (
                   <div className="space-y-2">
                     {templates.map(template => (
-                      <div key={template.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div key={template.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
                         <div>
-                          <div className="font-semibold text-gray-800">{template.name}</div>
-                          <div className="text-sm text-gray-500">
+                          <div className="font-semibold text-slate-200">{template.name}</div>
+                          <div className="text-sm text-slate-400">
                             {template.players.length} players • {new Date(template.createdAt).toLocaleDateString()}
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleLoadTemplate(template)}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 text-sm"
+                            className="px-4 py-2 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 text-sm"
                           >
                             <Upload className="w-4 h-4" />
                             Load
@@ -1719,21 +1719,21 @@ const App: React.FC = () => {
 
       {/* Template Save Modal */}
       {showTemplateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Save Template</h3>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700 shadow-2xl">
+            <h3 className="text-2xl font-bold text-slate-100 mb-4">Save Template</h3>
             <input
               type="text"
               value={newTemplateName}
               onChange={(e) => setNewTemplateName(e.target.value)}
               placeholder="Template name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder-slate-400 mb-4"
               autoFocus
             />
             <div className="flex gap-2">
               <button
                 onClick={handleSaveTemplate}
-                className="flex-1 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold"
+                className="flex-1 py-2 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 font-semibold"
               >
                 Save
               </button>
@@ -1742,7 +1742,7 @@ const App: React.FC = () => {
                   setShowTemplateModal(false);
                   setNewTemplateName('');
                 }}
-                className="flex-1 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold"
+                className="flex-1 py-2 bg-slate-700/300 text-white rounded-lg hover:bg-gray-600 font-semibold"
               >
                 Cancel
               </button>

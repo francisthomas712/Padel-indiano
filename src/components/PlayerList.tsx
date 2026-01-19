@@ -33,8 +33,8 @@ export const PlayerList: React.FC<PlayerListProps> = ({
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-        <Users className="w-5 h-5" />
+      <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-200">
+        <Users className="w-5 h-5 text-emerald-400" />
         Players ({players.filter(p => p.active).length} active)
       </h2>
 
@@ -46,7 +46,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
             onChange={(e) => onNewPlayerNameChange(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Enter player name"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 touch-target"
+            className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder-slate-400 touch-target"
             aria-label="New player name"
           />
           <input
@@ -57,19 +57,19 @@ export const PlayerList: React.FC<PlayerListProps> = ({
             placeholder="ELO (optional, default 1500)"
             min="100"
             max="3000"
-            className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 touch-target"
+            className="w-48 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder-slate-400 touch-target"
             aria-label="Initial ELO rating (optional)"
           />
           <button
             onClick={onAddPlayer}
-            className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 transition-colors touch-target"
+            className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 flex items-center gap-2 transition-all shadow-lg hover:shadow-emerald-500/50 touch-target"
             aria-label="Add player"
         >
           <Plus className="w-4 h-4" />
           Add
         </button>
         </div>
-        <p className="text-xs text-gray-500 px-1">
+        <p className="text-xs text-slate-400 px-1">
           Optional: Set custom starting ELO (100-3000). Leave blank for default 1500.
         </p>
       </div>
@@ -78,25 +78,25 @@ export const PlayerList: React.FC<PlayerListProps> = ({
         {players.map(player => (
           <div
             key={player.id}
-            className={`flex items-center justify-between p-3 rounded-lg border ${
+            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
               player.active
-                ? 'bg-gray-50 border-gray-200'
-                : 'bg-gray-100 border-gray-300 opacity-60'
+                ? 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 hover:shadow-lg'
+                : 'bg-slate-800/50 border-slate-700 opacity-50'
             }`}
           >
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className={`font-medium ${!player.active ? 'text-gray-500' : ''}`}>
+                <span className={`font-medium ${!player.active ? 'text-slate-500' : 'text-slate-200'}`}>
                   {player.name}
                 </span>
                 {!player.active && (
-                  <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded border border-orange-500/30">
                     Away
                   </span>
                 )}
               </div>
               {tournamentStarted && player.matchesPlayed > 0 && (
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-slate-400 mt-1">
                   {player.matchesPlayed} games | {player.sitOutCount || 0} sit-outs
                 </div>
               )}
@@ -105,10 +105,10 @@ export const PlayerList: React.FC<PlayerListProps> = ({
               {tournamentStarted ? (
                 <button
                   onClick={() => onToggleActive(player.id)}
-                  className={`transition-colors touch-target ${
+                  className={`transition-all touch-target ${
                     player.active
-                      ? 'text-orange-500 hover:text-orange-700'
-                      : 'text-green-500 hover:text-green-700'
+                      ? 'text-orange-400 hover:text-orange-300'
+                      : 'text-emerald-400 hover:text-emerald-300'
                   }`}
                   title={player.active ? 'Mark as away (temporarily inactive)' : 'Mark as back (active)'}
                   aria-label={player.active ? 'Mark player as away' : 'Mark player as back'}
@@ -118,7 +118,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
               ) : (
                 <button
                   onClick={() => onRemovePlayer(player.id)}
-                  className="text-red-500 hover:text-red-700 transition-colors touch-target"
+                  className="text-red-400 hover:text-red-300 transition-all touch-target"
                   title="Remove player"
                   aria-label={`Remove ${player.name}`}
                 >
