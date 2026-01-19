@@ -41,9 +41,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const pair1Multiplier = calculatePointMultiplier(pair1Elo, pair2Elo);
   const pair2Multiplier = calculatePointMultiplier(pair2Elo, pair1Elo);
 
-  // Calculate weighted points for display
-  const pair1WeightedPoints = Math.round(match.score1 * pair1Multiplier * 10) / 10;
-  const pair2WeightedPoints = Math.round(match.score2 * pair2Multiplier * 10) / 10;
+  // Use stored weighted points if available (from when match was completed)
+  // Otherwise calculate from current ELO ratings
+  const pair1WeightedPoints = match.weightedPoints1 ?? Math.round(match.score1 * pair1Multiplier * 10) / 10;
+  const pair2WeightedPoints = match.weightedPoints2 ?? Math.round(match.score2 * pair2Multiplier * 10) / 10;
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
