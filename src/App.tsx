@@ -28,6 +28,8 @@ import { Settings } from './components/Settings';
 // Types
 import {
   Player,
+  Pair,
+  Match,
   Round,
   FinalsMatch,
   LeaderboardMode,
@@ -82,6 +84,11 @@ const App: React.FC = () => {
   const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [showCustomRound, setShowCustomRound] = useState(false);
+  const [customPlayer1, setCustomPlayer1] = useState('');
+  const [customPlayer2, setCustomPlayer2] = useState('');
+  const [customPlayer3, setCustomPlayer3] = useState('');
+  const [customPlayer4, setCustomPlayer4] = useState('');
 
   // Load templates on mount
   useEffect(() => {
@@ -235,6 +242,76 @@ const App: React.FC = () => {
       toast.success(`Round ${state.rounds.length + 1} generated with ${matches.length} match${matches.length > 1 ? 'es' : ''}`);
     }
   }, [state.players, state.rounds, state.partnershipHistory, state.oppositionHistory, updateState]);
+
+  // Generate custom round with user-selected players
+  const generateCustomRound = useCallback(() => {
+    // Validate all 4 players are selected and unique
+    const selectedIds = [customPlayer1, customPlayer2, customPlayer3, customPlayer4];
+
+    if (selectedIds.some(id => !id)) {
+      toast.error('Please select all 4 players');
+      return;
+    }
+
+    const uniqueIds = new Set(selectedIds);
+    if (uniqueIds.size !== 4) {
+      toast.error('Please select 4 different players');
+      return;
+    }
+
+    // Get the actual player objects
+    const players = selectedIds.map(id => state.players.find(p => p.id === id)!);
+
+    // Create pairs (player 1+2 vs player 3+4)
+    const pair1: Pair = {
+      id: 'custom-pair1',
+      players: [players[0], players[1]],
+      avgSkill: (players[0].eloRating + players[1].eloRating) / 2
+    };
+
+    const pair2: Pair = {
+      id: 'custom-pair2',
+      players: [players[2], players[3]],
+      avgSkill: (players[2].eloRating + players[3].eloRating) / 2
+    };
+
+    // Create the match
+    const match: Match = {
+      id: `r${state.rounds.length}-m0`,
+      pair1,
+      pair2,
+      score1: 0,
+      score2: 0,
+      completed: false,
+      startTime: Date.now()
+    };
+
+    // Create the round
+    const newRound: Round = {
+      id: state.rounds.length,
+      matches: [match],
+      completed: false,
+      sittingOut: null
+    };
+
+    updateState(
+      { rounds: [...state.rounds, newRound] },
+      {
+        type: 'round_generate',
+        timestamp: Date.now(),
+        data: { round: newRound }
+      }
+    );
+
+    // Reset custom round state
+    setShowCustomRound(false);
+    setCustomPlayer1('');
+    setCustomPlayer2('');
+    setCustomPlayer3('');
+    setCustomPlayer4('');
+
+    toast.success(`Custom round generated: ${players[0].name} + ${players[1].name} vs ${players[2].name} + ${players[3].name}`);
+  }, [customPlayer1, customPlayer2, customPlayer3, customPlayer4, state.players, state.rounds, updateState]);
 
   // Start tournament
   const startTournament = useCallback(() => {
@@ -708,7 +785,16 @@ const App: React.FC = () => {
         winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0'
       }));
 
-    if (leaderboardMode === 'ppg') {
+    if (leaderboardMode === 'elo') {
+      // Sort by ELO rating (highest first)
+      return playersWithStats.sort((a, b) => {
+        if (b.eloRating !== a.eloRating) return b.eloRating - a.eloRating;
+        // Tiebreaker: PPG
+        const ppgDiff = parseFloat(b.ppg) - parseFloat(a.ppg);
+        if (Math.abs(ppgDiff) > 0.001) return ppgDiff;
+        return parseFloat(b.winRate) - parseFloat(a.winRate);
+      });
+    } else if (leaderboardMode === 'ppg') {
       return playersWithStats.sort((a, b) => {
         const ppgDiff = parseFloat(b.ppg) - parseFloat(a.ppg);
         if (Math.abs(ppgDiff) > 0.001) return ppgDiff;
@@ -725,14 +811,22 @@ const App: React.FC = () => {
 
   // Initiate finals
   const initiateFinals = useCallback(() => {
-    const leaderboard = getLeaderboard();
+    // Get top 4 players by ELO rating (not current leaderboard mode)
+    const playersWithStats = state.players
+      .filter(p => p.matchesPlayed > 0)
+      .map(p => ({
+        ...p,
+        ppg: p.matchesPlayed > 0 ? (p.points / p.matchesPlayed).toFixed(2) : '0.00',
+        winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0'
+      }))
+      .sort((a, b) => b.eloRating - a.eloRating); // Sort by ELO
 
-    if (leaderboard.length < 4) {
+    if (playersWithStats.length < 4) {
       toast.error('Need at least 4 players who have played matches to start finals');
       return;
     }
 
-    const top4 = leaderboard.slice(0, 4);
+    const top4 = playersWithStats.slice(0, 4);
 
     const finals: FinalsMatch = {
       id: 'finals',
@@ -1288,8 +1382,8 @@ const App: React.FC = () => {
                       </div>
                     ))}
 
-                    {/* Generate Next Round Button */}
-                    <div className="bg-white rounded-2xl shadow-xl p-6">
+                    {/* Generate Round Buttons */}
+                    <div className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
                       <button
                         onClick={generateNextRound}
                         className="w-full py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold text-lg transition-colors flex items-center justify-center gap-2"
@@ -1297,6 +1391,97 @@ const App: React.FC = () => {
                         <Plus className="w-5 h-5" />
                         Generate Next Round
                       </button>
+
+                      <button
+                        onClick={() => setShowCustomRound(!showCustomRound)}
+                        className="w-full py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-colors flex items-center justify-center gap-2"
+                      >
+                        <PlusCircle className="w-5 h-5" />
+                        {showCustomRound ? 'Cancel Custom Round' : 'Generate Custom Round'}
+                      </button>
+
+                      {/* Custom Round Player Selection */}
+                      {showCustomRound && (
+                        <div className="border-t pt-4 space-y-4">
+                          <h4 className="font-bold text-gray-800">Select Players for Custom Round</h4>
+                          <p className="text-sm text-gray-600">Team 1: Player 1 + Player 2 vs Team 2: Player 3 + Player 4</p>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Team 1 */}
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-700">Team 1 - Player 1</label>
+                              <select
+                                value={customPlayer1}
+                                onChange={(e) => setCustomPlayer1(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                <option value="">Select player...</option>
+                                {state.players.filter(p => p.active).map(player => (
+                                  <option key={player.id} value={player.id}>
+                                    {player.name} (ELO: {player.eloRating})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-700">Team 1 - Player 2</label>
+                              <select
+                                value={customPlayer2}
+                                onChange={(e) => setCustomPlayer2(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                <option value="">Select player...</option>
+                                {state.players.filter(p => p.active).map(player => (
+                                  <option key={player.id} value={player.id}>
+                                    {player.name} (ELO: {player.eloRating})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Team 2 */}
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-700">Team 2 - Player 3</label>
+                              <select
+                                value={customPlayer3}
+                                onChange={(e) => setCustomPlayer3(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                <option value="">Select player...</option>
+                                {state.players.filter(p => p.active).map(player => (
+                                  <option key={player.id} value={player.id}>
+                                    {player.name} (ELO: {player.eloRating})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-700">Team 2 - Player 4</label>
+                              <select
+                                value={customPlayer4}
+                                onChange={(e) => setCustomPlayer4(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                <option value="">Select player...</option>
+                                {state.players.filter(p => p.active).map(player => (
+                                  <option key={player.id} value={player.id}>
+                                    {player.name} (ELO: {player.eloRating})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={generateCustomRound}
+                            className="w-full py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold transition-colors"
+                          >
+                            Create Custom Match
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
