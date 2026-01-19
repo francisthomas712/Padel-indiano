@@ -41,6 +41,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const pair1Multiplier = calculatePointMultiplier(pair1Elo, pair2Elo);
   const pair2Multiplier = calculatePointMultiplier(pair2Elo, pair1Elo);
 
+  // Calculate weighted points for display
+  const pair1WeightedPoints = Math.round(match.score1 * pair1Multiplier * 10) / 10;
+  const pair2WeightedPoints = Math.round(match.score2 * pair2Multiplier * 10) / 10;
+
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
       <div className="grid grid-cols-3 gap-4 items-center">
@@ -127,6 +131,11 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             <div className={`font-semibold ${pair1Multiplier > 1.0 ? 'text-green-600' : pair1Multiplier < 1.0 ? 'text-orange-600' : 'text-gray-600'}`}>
               {pair1Multiplier.toFixed(2)}x points
             </div>
+            {match.completed && (
+              <div className="text-gray-700 font-medium mt-1">
+                {match.score1} → {pair1WeightedPoints} pts
+              </div>
+            )}
           </div>
 
           {/* Center - Match Quality Indicator */}
@@ -146,6 +155,11 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             <div className={`font-semibold ${pair2Multiplier > 1.0 ? 'text-green-600' : pair2Multiplier < 1.0 ? 'text-orange-600' : 'text-gray-600'}`}>
               {pair2Multiplier.toFixed(2)}x points
             </div>
+            {match.completed && (
+              <div className="text-gray-700 font-medium mt-1">
+                {match.score2} → {pair2WeightedPoints} pts
+              </div>
+            )}
           </div>
         </div>
       </div>

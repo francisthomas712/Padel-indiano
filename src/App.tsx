@@ -843,7 +843,7 @@ const App: React.FC = () => {
 
   // Initiate finals
   const initiateFinals = useCallback(() => {
-    // Get top 4 players by ELO rating (not current leaderboard mode)
+    // Get top 4 players by weighted PPG (not current leaderboard mode)
     // Only include active players who have played matches
     const playersWithStats = state.players
       .filter(p => p.matchesPlayed > 0 && p.active)
@@ -852,7 +852,15 @@ const App: React.FC = () => {
         ppg: p.matchesPlayed > 0 ? (p.points / p.matchesPlayed).toFixed(2) : '0.00',
         winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0'
       }))
-      .sort((a, b) => b.eloRating - a.eloRating); // Sort by ELO
+      .sort((a, b) => {
+        // Sort by weighted PPG (highest first)
+        const ppgDiff = parseFloat(b.ppg) - parseFloat(a.ppg);
+        if (Math.abs(ppgDiff) > 0.001) return ppgDiff;
+        // Tiebreaker: total points
+        if (b.points !== a.points) return b.points - a.points;
+        // Second tiebreaker: ELO
+        return b.eloRating - a.eloRating;
+      });
 
     if (playersWithStats.length < 4) {
       toast.error('Need at least 4 active players who have played matches to start finals');
