@@ -44,17 +44,18 @@ export const generatePairs = (
         const partnerCount = partnershipHistory[p1.id]?.[p2.id] || 0;
         const skillDiff = Math.abs(getPlayerSkill(p1) - getPlayerSkill(p2));
 
-        // Scoring weights:
-        // - Never played together: +1000
-        // - Played once: +500
-        // - Played twice: 0
-        // - Played 3+ times: -500 per additional time
-        const varietyScore = partnerCount === 0 ? 1000 :
-                            partnerCount === 1 ? 500 :
-                            partnerCount === 2 ? 0 : -500 * (partnerCount - 2);
+        // Scoring weights (heavily prioritize variety):
+        // - Never played together: +2000 (high priority)
+        // - Played once: -500 (strong penalty to avoid repeats)
+        // - Played twice: -1500 (very strong penalty)
+        // - Played 3+ times: -2000 per additional time (massive penalty)
+        const varietyScore = partnerCount === 0 ? 2000 :
+                            partnerCount === 1 ? -500 :
+                            partnerCount === 2 ? -1500 : -2000 * (partnerCount - 1);
 
         // Prefer skill balance (lower diff is better)
-        const skillScore = -skillDiff * 50;
+        // But make this less important than variety
+        const skillScore = -skillDiff * 20;
 
         const totalScore = varietyScore + skillScore;
 
@@ -115,11 +116,12 @@ export const matchPairs = (
 
       const skillDiff = Math.abs((pair1.avgSkill || 0) - (pair2.avgSkill || 0));
 
-      // Scoring:
-      // - Prefer pairs that haven't played against each other
-      // - Prefer similar combined skill levels
-      const varietyScore = oppCount === 0 ? 1000 : -oppCount * 200;
-      const balanceScore = -skillDiff * 100;
+      // Scoring (heavily prioritize variety over balance):
+      // - Never played against each other: +2000 (high priority)
+      // - Played once or more: strong penalty (-300 per time)
+      // - Balance is secondary concern
+      const varietyScore = oppCount === 0 ? 2000 : -oppCount * 300;
+      const balanceScore = -skillDiff * 50;
 
       const totalScore = varietyScore + balanceScore;
 
