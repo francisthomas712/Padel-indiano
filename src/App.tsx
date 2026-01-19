@@ -825,8 +825,9 @@ const App: React.FC = () => {
   // Initiate finals
   const initiateFinals = useCallback(() => {
     // Get top 4 players by ELO rating (not current leaderboard mode)
+    // Only include active players who have played matches
     const playersWithStats = state.players
-      .filter(p => p.matchesPlayed > 0)
+      .filter(p => p.matchesPlayed > 0 && p.active)
       .map(p => ({
         ...p,
         ppg: p.matchesPlayed > 0 ? (p.points / p.matchesPlayed).toFixed(2) : '0.00',
@@ -835,7 +836,7 @@ const App: React.FC = () => {
       .sort((a, b) => b.eloRating - a.eloRating); // Sort by ELO
 
     if (playersWithStats.length < 4) {
-      toast.error('Need at least 4 players who have played matches to start finals');
+      toast.error('Need at least 4 active players who have played matches to start finals');
       return;
     }
 
