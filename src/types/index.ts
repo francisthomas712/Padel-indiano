@@ -32,6 +32,8 @@ export interface Match {
   endTime?: number;
   currentServer?: 'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2';
   court?: number;  // Optional court assignment for parallel matches
+  /** ELO change applied to each player at completion — used for exact reversal on delete/edit */
+  eloDeltas?: Record<string, number>;
 }
 
 export interface Round {
@@ -74,6 +76,8 @@ export interface OppositionHistory {
 export interface TournamentSettings {
   pointsToWin: number;
   finalsFormat: 'traditional' | 'semifinal';
+  /** Number of courts available — caps matches per round (default: 2) */
+  courts?: number;
   /** Winner must lead by 2 once pointsToWin is reached (default: off) */
   winByTwo?: boolean;
   /** With winByTwo, tied score at/above target is broken by next point (default: off) */

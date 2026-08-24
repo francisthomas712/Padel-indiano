@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Plus, Trash2, ToggleLeft, ToggleRight, Pencil, Check, X } from 'lucide-react';
+import { Users, Plus, Trash2, ToggleLeft, ToggleRight, Pencil, Check, X, RotateCcw } from 'lucide-react';
 import { Player } from '../types';
 
 interface PlayerListProps {
@@ -11,6 +11,7 @@ interface PlayerListProps {
   onAddPlayer: () => void;
   onRemovePlayer: (playerId: string) => void;
   onEditPlayer: (playerId: string, name: string, elo: number) => void;
+  onResetElo: (playerId: string) => void;
   onToggleActive: (playerId: string) => void;
   tournamentStarted: boolean;
 }
@@ -24,6 +25,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
   onAddPlayer,
   onRemovePlayer,
   onEditPlayer,
+  onResetElo,
   onToggleActive,
   tournamentStarted
 }) => {
@@ -191,6 +193,14 @@ export const PlayerList: React.FC<PlayerListProps> = ({
                     aria-label={`Edit ${player.name}`}
                   >
                     <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onResetElo(player.id)}
+                    className="text-slate-400 hover:text-yellow-400 transition-all touch-target"
+                    title="Reset ELO to 1500 (keeps record)"
+                    aria-label={`Reset ${player.name}'s ELO`}
+                  >
+                    <RotateCcw className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onRemovePlayer(player.id)}

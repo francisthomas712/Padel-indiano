@@ -4,7 +4,8 @@ import { saveTournamentState, loadTournamentState } from '../utils/localStorage'
 
 const initialSettings = {
   pointsToWin: 7,
-  finalsFormat: 'traditional' as const
+  finalsFormat: 'traditional' as const,
+  courts: 2
 };
 
 const initialState: TournamentState = {

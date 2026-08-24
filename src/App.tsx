@@ -42,7 +42,9 @@ import {
   HistoryEntry,
   LeaderboardMode,
   ActiveTab,
-  PlayerWithStats
+  PlayerWithStats,
+  PartnershipHistory,
+  OppositionHistory
 } from './types';
 
 // Utils
@@ -95,6 +97,95 @@ const resolveServerName = (server: ServerPosition | undefined, pair1: Pair, pair
   const info = getServerInfo(server);
   const servingPair = info.pair === 1 ? pair1 : pair2;
   return servingPair.players[info.slot]?.name ?? null;
+};
+
+/** Accumulator for reversing one or more completed matches' impact. */
+interface RevertAccumulator {
+  players: Player[];
+  partnershipHistory: PartnershipHistory;
+  oppositionHistory: OppositionHistory;
+}
+
+/**
+ * Reverse everything a completed match did to the state: player stats
+ * (points/wins/losses/matchesPlayed), ELO ratings, and partnership/opposition
+ * history. ELO reversal uses the per-player deltas stored on the match at
+ * completion; matches completed before deltas were stored fall back to a
+ * recomputed approximation from current ratings.
+ * Mutates the accumulator's arrays/objects — callers pass fresh copies.
+ */
+const revertMatchImpact = (acc: RevertAccumulator, match: Match): void => {
+  const pair1PlayerIds = match.pair1.players.map(p => p.id);
+  const pair2PlayerIds = match.pair2.players.map(p => p.id);
+
+  // Stored weighted points, falling back to raw scores for legacy matches
+  const points1 = match.weightedPoints1 ?? match.score1;
+  const points2 = match.weightedPoints2 ?? match.score2;
+
+  // Approximate ELO reversal for matches without stored deltas:
+  // recompute the adjustment from current ratings (exact for stored deltas).
+  const fallbackEloDeltas = (() => {
+    if (match.eloDeltas) return null;
+    const ratingOf = (id: string): number =>
+      acc.players.find(p => p.id === id)?.eloRating ?? INITIAL_ELO;
+    const playedOf = (id: string): number =>
+      acc.players.find(p => p.id === id)?.matchesPlayed ?? 0;
+    const newRatings = updateMatchElo(
+      { id: pair1PlayerIds[0], rating: ratingOf(pair1PlayerIds[0]), matchesPlayed: playedOf(pair1PlayerIds[0]) },
+      { id: pair1PlayerIds[1], rating: ratingOf(pair1PlayerIds[1]), matchesPlayed: playedOf(pair1PlayerIds[1]) },
+      { id: pair2PlayerIds[0], rating: ratingOf(pair2PlayerIds[0]), matchesPlayed: playedOf(pair2PlayerIds[0]) },
+      { id: pair2PlayerIds[1], rating: ratingOf(pair2PlayerIds[1]), matchesPlayed: playedOf(pair2PlayerIds[1]) },
+      match.score1,
+      match.score2
+    );
+    const deltas: Record<string, number> = {};
+    Object.entries(newRatings).forEach(([id, newRating]) => {
+      deltas[id] = newRating - ratingOf(id);
+    });
+    return deltas;
+  })();
+  const eloDeltas = match.eloDeltas ?? fallbackEloDeltas ?? {};
+
+  const revertFor = (playerIds: string[], points: number, ownScore: number, otherScore: number) => {
+    playerIds.forEach(playerId => {
+      const player = acc.players.find(p => p.id === playerId);
+      if (!player) return;
+      player.points -= points;
+      player.matchesPlayed = Math.max(0, player.matchesPlayed - 1);
+      if (ownScore > otherScore) player.wins = Math.max(0, player.wins - 1);
+      else if (ownScore < otherScore) player.losses = Math.max(0, player.losses - 1);
+      const delta = eloDeltas[playerId];
+      if (delta !== undefined) {
+        player.eloRating = Math.round(player.eloRating - delta);
+      }
+    });
+  };
+
+  revertFor(pair1PlayerIds, points1, match.score1, match.score2);
+  revertFor(pair2PlayerIds, points2, match.score2, match.score1);
+
+  // Reverse partnership history
+  [pair1PlayerIds, pair2PlayerIds].forEach(pairIds => {
+    const [p1, p2] = pairIds;
+    if (acc.partnershipHistory[p1]?.[p2]) {
+      acc.partnershipHistory[p1][p2] = Math.max(0, acc.partnershipHistory[p1][p2] - 1);
+    }
+    if (acc.partnershipHistory[p2]?.[p1]) {
+      acc.partnershipHistory[p2][p1] = Math.max(0, acc.partnershipHistory[p2][p1] - 1);
+    }
+  });
+
+  // Reverse opposition history
+  pair1PlayerIds.forEach(p1 => {
+    pair2PlayerIds.forEach(p2 => {
+      if (acc.oppositionHistory[p1]?.[p2]) {
+        acc.oppositionHistory[p1][p2] = Math.max(0, acc.oppositionHistory[p1][p2] - 1);
+      }
+      if (acc.oppositionHistory[p2]?.[p1]) {
+        acc.oppositionHistory[p2][p1] = Math.max(0, acc.oppositionHistory[p2][p1] - 1);
+      }
+    });
+  });
 };
 
 const App: React.FC = () => {
@@ -307,6 +398,27 @@ const App: React.FC = () => {
     toast.success(`Updated ${trimmed}`);
   }, [state.players, updateState]);
 
+  // Reset a player's ELO to the default starting rating (keeps win/loss record)
+  const resetPlayerElo = useCallback((playerId: string) => {
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) return;
+    if (!window.confirm(`Reset ${player.name}'s ELO to ${INITIAL_ELO}? Their win/loss record is kept.`)) return;
+
+    updateState(
+      {
+        players: state.players.map(p =>
+          p.id === playerId ? { ...p, eloRating: INITIAL_ELO, initialElo: INITIAL_ELO } : p
+        )
+      },
+      {
+        type: 'player_edit',
+        timestamp: Date.now(),
+        data: { playerId, eloReset: true }
+      }
+    );
+    toast.success(`${player.name}'s ELO reset to ${INITIAL_ELO}`);
+  }, [state.players, updateState]);
+
   // Toggle player active/inactive status
   const togglePlayerActive = useCallback((playerId: string) => {
     const player = state.players.find(p => p.id === playerId);
@@ -368,9 +480,23 @@ const App: React.FC = () => {
       return;
     }
 
-    // Match pairs against each other, assigning court numbers for parallel matches
-    const matches = matchPairs(pairs, state.oppositionHistory, state.rounds.length)
-      .map((match, index) => ({ ...match, court: index + 1 }));
+    // Match pairs against each other, then cap to the available number of courts
+    const courtCount = state.settings.courts ?? 2;
+    const allMatches = matchPairs(pairs, state.oppositionHistory, state.rounds.length);
+    const matches = allMatches.slice(0, courtCount).map((match, index) => ({ ...match, court: index + 1 }));
+
+    // Players left courtless by the court cap also sit out this round
+    const playingIds = new Set(
+      matches.flatMap(m => [...m.pair1.players.map(p => p.id), ...m.pair2.players.map(p => p.id)])
+    );
+    const benched = playersToMatch.filter(p => !playingIds.has(p.id));
+    if (benched.length > 0) {
+      const existingSitters = sittingOut === null ? [] : 'players' in sittingOut ? sittingOut.players : [sittingOut];
+      const allSitters = [...existingSitters, ...benched];
+      sittingOut = allSitters.length === 1
+        ? allSitters[0]
+        : { id: 'multi', name: allSitters.map(p => p.name).join(', '), players: allSitters };
+    }
 
     if (matches.length > 0) {
       // Credit sit-outs immediately so the next round's picker sees fresh counts
@@ -400,9 +526,9 @@ const App: React.FC = () => {
         }
       );
 
-      toast.success(`Round ${state.rounds.length + 1} generated with ${matches.length} match${matches.length > 1 ? 'es' : ''}`);
+      toast.success(`Round ${state.rounds.length + 1} generated with ${matches.length} match${matches.length > 1 ? 'es' : ''}${allMatches.length > matches.length ? ` (${allMatches.length - matches.length} waiting — only ${courtCount} court${courtCount > 1 ? 's' : ''})` : ''}`);
     }
-  }, [state.players, state.rounds, state.partnershipHistory, state.oppositionHistory, updateState]);
+  }, [state.players, state.rounds, state.partnershipHistory, state.oppositionHistory, state.settings.courts, updateState]);
 
   // Generate custom round with user-selected players
   const generateCustomRound = useCallback(() => {
@@ -620,7 +746,13 @@ const App: React.FC = () => {
       });
     });
 
-    // Mark match as completed and store weighted points for accurate reversal
+    // Mark match as completed and store weighted points + per-player ELO deltas
+    // (deltas make deletion/editing exactly reversible later)
+    const eloDeltas: Record<string, number> = {};
+    [...pair1Players, ...pair2Players].forEach(p => {
+      eloDeltas[p.id] = newEloRatings[p.id] - p.eloRating;
+    });
+
     const updatedRounds = state.rounds.map(r => {
       if (r.id === roundId) {
         const updatedMatches = r.matches.map(m =>
@@ -629,7 +761,8 @@ const App: React.FC = () => {
             completed: true,
             endTime: Date.now(),
             weightedPoints1: pair1WeightedPoints,
-            weightedPoints2: pair2WeightedPoints
+            weightedPoints2: pair2WeightedPoints,
+            eloDeltas
           } : m
         );
         const allMatchesComplete = updatedMatches.every(m => m.completed);
@@ -670,59 +803,13 @@ const App: React.FC = () => {
 
     if (!round || !match || !match.completed) return;
 
-    // Remove the match's contribution from player stats
-    const updatedPlayers = [...state.players];
-    const pair1PlayerIds = match.pair1.players.map(p => p.id);
-    const pair2PlayerIds = match.pair2.players.map(p => p.id);
-
-    // Use stored weighted points if available, otherwise fall back to raw scores
-    const points1 = match.weightedPoints1 ?? match.score1;
-    const points2 = match.weightedPoints2 ?? match.score2;
-
-    pair1PlayerIds.forEach(playerId => {
-      const player = updatedPlayers.find(p => p.id === playerId);
-      if (player) {
-        player.points -= points1;
-        player.matchesPlayed -= 1;
-        if (match.score1 > match.score2) player.wins -= 1;
-        else if (match.score1 < match.score2) player.losses -= 1;
-      }
-    });
-
-    pair2PlayerIds.forEach(playerId => {
-      const player = updatedPlayers.find(p => p.id === playerId);
-      if (player) {
-        player.points -= points2;
-        player.matchesPlayed -= 1;
-        if (match.score2 > match.score1) player.wins -= 1;
-        else if (match.score2 < match.score1) player.losses -= 1;
-      }
-    });
-
-    // Remove partnership history
-    const newPartnershipHistory = { ...state.partnershipHistory };
-    [pair1PlayerIds, pair2PlayerIds].forEach(pairIds => {
-      const [p1, p2] = pairIds;
-      if (newPartnershipHistory[p1]?.[p2]) {
-        newPartnershipHistory[p1][p2] = Math.max(0, newPartnershipHistory[p1][p2] - 1);
-      }
-      if (newPartnershipHistory[p2]?.[p1]) {
-        newPartnershipHistory[p2][p1] = Math.max(0, newPartnershipHistory[p2][p1] - 1);
-      }
-    });
-
-    // Remove opposition history
-    const newOppositionHistory = { ...state.oppositionHistory };
-    pair1PlayerIds.forEach(p1 => {
-      pair2PlayerIds.forEach(p2 => {
-        if (newOppositionHistory[p1]?.[p2]) {
-          newOppositionHistory[p1][p2] = Math.max(0, newOppositionHistory[p1][p2] - 1);
-        }
-        if (newOppositionHistory[p2]?.[p1]) {
-          newOppositionHistory[p2][p1] = Math.max(0, newOppositionHistory[p2][p1] - 1);
-        }
-      });
-    });
+    // Reverse the match's full impact (stats, ELO, histories) while editing
+    const acc: RevertAccumulator = {
+      players: state.players.map(p => ({ ...p })),
+      partnershipHistory: { ...state.partnershipHistory },
+      oppositionHistory: { ...state.oppositionHistory }
+    };
+    revertMatchImpact(acc, match);
 
     // Mark match as not completed
     const updatedRounds = state.rounds.map(r => {
@@ -739,10 +826,10 @@ const App: React.FC = () => {
     });
 
     updateState({
-      players: updatedPlayers,
+      players: acc.players,
       rounds: updatedRounds,
-      partnershipHistory: newPartnershipHistory,
-      oppositionHistory: newOppositionHistory
+      partnershipHistory: acc.partnershipHistory,
+      oppositionHistory: acc.oppositionHistory
     });
 
     setEditingMatch({ roundId, matchId });
@@ -775,63 +862,18 @@ const App: React.FC = () => {
     if (!round || !match) return;
 
     if (match.completed) {
-      // Remove the match's contribution from player stats (same as start editing)
-      const updatedPlayers = [...state.players];
-      const pair1PlayerIds = match.pair1.players.map(p => p.id);
-      const pair2PlayerIds = match.pair2.players.map(p => p.id);
-
-      // Use stored weighted points if available, otherwise fall back to raw scores
-      const points1 = match.weightedPoints1 ?? match.score1;
-      const points2 = match.weightedPoints2 ?? match.score2;
-
-      pair1PlayerIds.forEach(playerId => {
-        const player = updatedPlayers.find(p => p.id === playerId);
-        if (player) {
-          player.points -= points1;
-          player.matchesPlayed -= 1;
-          if (match.score1 > match.score2) player.wins -= 1;
-          else if (match.score1 < match.score2) player.losses -= 1;
-        }
-      });
-
-      pair2PlayerIds.forEach(playerId => {
-        const player = updatedPlayers.find(p => p.id === playerId);
-        if (player) {
-          player.points -= points2;
-          player.matchesPlayed -= 1;
-          if (match.score2 > match.score1) player.wins -= 1;
-          else if (match.score2 < match.score1) player.losses -= 1;
-        }
-      });
-
-      // Remove partnership and opposition history
-      const newPartnershipHistory = { ...state.partnershipHistory };
-      [pair1PlayerIds, pair2PlayerIds].forEach(pairIds => {
-        const [p1, p2] = pairIds;
-        if (newPartnershipHistory[p1]?.[p2]) {
-          newPartnershipHistory[p1][p2] = Math.max(0, newPartnershipHistory[p1][p2] - 1);
-        }
-        if (newPartnershipHistory[p2]?.[p1]) {
-          newPartnershipHistory[p2][p1] = Math.max(0, newPartnershipHistory[p2][p1] - 1);
-        }
-      });
-
-      const newOppositionHistory = { ...state.oppositionHistory };
-      pair1PlayerIds.forEach(p1 => {
-        pair2PlayerIds.forEach(p2 => {
-          if (newOppositionHistory[p1]?.[p2]) {
-            newOppositionHistory[p1][p2] = Math.max(0, newOppositionHistory[p1][p2] - 1);
-          }
-          if (newOppositionHistory[p2]?.[p1]) {
-            newOppositionHistory[p2][p1] = Math.max(0, newOppositionHistory[p2][p1] - 1);
-          }
-        });
-      });
+      // Reverse the match's full impact (stats, ELO, histories)
+      const acc: RevertAccumulator = {
+        players: state.players.map(p => ({ ...p })),
+        partnershipHistory: { ...state.partnershipHistory },
+        oppositionHistory: { ...state.oppositionHistory }
+      };
+      revertMatchImpact(acc, match);
 
       updateState({
-        players: updatedPlayers,
-        partnershipHistory: newPartnershipHistory,
-        oppositionHistory: newOppositionHistory
+        players: acc.players,
+        partnershipHistory: acc.partnershipHistory,
+        oppositionHistory: acc.oppositionHistory
       });
     }
 
@@ -869,76 +911,21 @@ const App: React.FC = () => {
     const round = state.rounds.find(r => r.id === roundId);
     if (!round) return;
 
-    // If round has completed matches, need to reverse stats
+    // If round has completed matches, reverse their full impact (stats, ELO, histories)
     const completedMatches = round.matches.filter(m => m.completed);
 
     if (completedMatches.length > 0) {
-      const updatedPlayers = [...state.players];
-      const newPartnershipHistory = { ...state.partnershipHistory };
-      const newOppositionHistory = { ...state.oppositionHistory };
-
-      // Reverse stats for each completed match
-      completedMatches.forEach(match => {
-        const pair1PlayerIds = match.pair1.players.map(p => p.id);
-        const pair2PlayerIds = match.pair2.players.map(p => p.id);
-
-        // Use stored weighted points if available, otherwise fall back to raw scores
-        const points1 = match.weightedPoints1 ?? match.score1;
-        const points2 = match.weightedPoints2 ?? match.score2;
-
-        // Reverse player stats
-        pair1PlayerIds.forEach(playerId => {
-          const player = updatedPlayers.find(p => p.id === playerId);
-          if (player) {
-            player.points -= points1;
-            player.matchesPlayed -= 1;
-            if (match.score1 > match.score2) player.wins -= 1;
-            else if (match.score1 < match.score2) player.losses -= 1;
-          }
-        });
-
-        pair2PlayerIds.forEach(playerId => {
-          const player = updatedPlayers.find(p => p.id === playerId);
-          if (player) {
-            player.points -= points2;
-            player.matchesPlayed -= 1;
-            if (match.score2 > match.score1) player.wins -= 1;
-            else if (match.score2 < match.score1) player.losses -= 1;
-          }
-        });
-
-        // Reverse partnership history
-        [pair1PlayerIds, pair2PlayerIds].forEach(pairIds => {
-          const [p1, p2] = pairIds;
-          if (newPartnershipHistory[p1]?.[p2]) {
-            newPartnershipHistory[p1][p2] -= 1;
-            if (newPartnershipHistory[p1][p2] === 0) delete newPartnershipHistory[p1][p2];
-          }
-          if (newPartnershipHistory[p2]?.[p1]) {
-            newPartnershipHistory[p2][p1] -= 1;
-            if (newPartnershipHistory[p2][p1] === 0) delete newPartnershipHistory[p2][p1];
-          }
-        });
-
-        // Reverse opposition history
-        pair1PlayerIds.forEach(p1 => {
-          pair2PlayerIds.forEach(p2 => {
-            if (newOppositionHistory[p1]?.[p2]) {
-              newOppositionHistory[p1][p2] -= 1;
-              if (newOppositionHistory[p1][p2] === 0) delete newOppositionHistory[p1][p2];
-            }
-            if (newOppositionHistory[p2]?.[p1]) {
-              newOppositionHistory[p2][p1] -= 1;
-              if (newOppositionHistory[p2][p1] === 0) delete newOppositionHistory[p2][p1];
-            }
-          });
-        });
-      });
+      const acc: RevertAccumulator = {
+        players: state.players.map(p => ({ ...p })),
+        partnershipHistory: { ...state.partnershipHistory },
+        oppositionHistory: { ...state.oppositionHistory }
+      };
+      completedMatches.forEach(match => revertMatchImpact(acc, match));
 
       updateState({
-        players: updatedPlayers,
-        partnershipHistory: newPartnershipHistory,
-        oppositionHistory: newOppositionHistory
+        players: acc.players,
+        partnershipHistory: acc.partnershipHistory,
+        oppositionHistory: acc.oppositionHistory
       });
     }
 
@@ -1905,6 +1892,7 @@ const App: React.FC = () => {
                   onAddPlayer={addPlayer}
                   onRemovePlayer={removePlayer}
                   onEditPlayer={editPlayer}
+                  onResetElo={resetPlayerElo}
                   onToggleActive={togglePlayerActive}
                   tournamentStarted={state.tournamentStarted}
                 />

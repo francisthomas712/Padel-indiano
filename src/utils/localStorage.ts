@@ -10,9 +10,11 @@ const CURRENT_VERSION = '3.1.0'; // v3.1.0: court labels, win-by-two & golden-po
 // New fields are optional with safe defaults, so this never drops user data.
 const normalizeSettings = (settings: unknown): TournamentState['settings'] => {
   const raw = (typeof settings === 'object' && settings !== null ? settings : {}) as Record<string, unknown>;
+  const courts = typeof raw.courts === 'number' ? Math.round(raw.courts) : 2;
   return {
     pointsToWin: typeof raw.pointsToWin === 'number' && raw.pointsToWin >= 3 ? raw.pointsToWin : 7,
     finalsFormat: raw.finalsFormat === 'semifinal' ? 'semifinal' : 'traditional',
+    courts: Math.min(16, Math.max(1, courts)),
     winByTwo: raw.winByTwo === true,
     goldenPoint: raw.goldenPoint === true
   };
