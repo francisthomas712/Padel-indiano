@@ -55,26 +55,6 @@ export const Settings: React.FC<SettingsProps> = ({
           </p>
         </div>
         <div>
-          <label htmlFor="courts" className="block text-sm font-medium text-gray-700 mb-2">
-            Number of Courts
-          </label>
-          <input
-            id="courts"
-            type="number"
-            min="1"
-            max="16"
-            value={settings.courts ?? 2}
-            onChange={(e) => onSettingsChange({ ...settings, courts: Number(e.target.value) })}
-            disabled={disabled}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            How many matches run in parallel each round (e.g. 2 courts = 8 players playing).
-            Extra players sit out and rotate back in automatically.
-          </p>
-        </div>
-
-        <div>
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"

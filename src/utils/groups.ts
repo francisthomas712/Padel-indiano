@@ -108,3 +108,54 @@ export const deleteGroup = (rawName: string): void => {
   delete groups[key];
   persistGroups(groups);
 };
+
+/**
+ * Encode a group into a URL-safe string so it can travel between devices via
+ * a share link (the app has no backend — localStorage is per-device).
+ */
+export const encodeGroup = (group: Group): string => {
+  const payload = JSON.stringify({ n: group.name, p: group.players, s: group.settings });
+  const bytes = new TextEncoder().encode(payload);
+  let binary = '';
+  bytes.forEach(b => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+/** Decode a share code back into a group. Returns null if invalid/corrupted. */
+export const decodeGroup = (code: string): Group | null => {
+  try {
+    let b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4 !== 0) b64 += '=';
+    const binary = atob(b64);
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const raw = JSON.parse(new TextDecoder().decode(bytes)) as {
+      n?: unknown; p?: unknown; s?: unknown;
+    };
+
+    if (typeof raw.n !== 'string' || !isValidGroupName(raw.n) || !Array.isArray(raw.p)) {
+      return null;
+    }
+
+    const players = (raw.p as Array<Record<string, unknown>>)
+      .map(p => ({
+        name: String(p.name ?? ''),
+        eloRating: typeof p.eloRating === 'number' ? p.eloRating : 1500,
+        avatar: typeof p.avatar === 'string' ? p.avatar : undefined
+      }))
+      .filter(p => p.name.length > 0);
+
+    if (players.length === 0) return null;
+
+    const name = raw.n;
+    return {
+      name,
+      key: normalizeGroupName(name),
+      players,
+      settings: (typeof raw.s === 'object' && raw.s !== null ? raw.s : undefined) as Group['settings'],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+  } catch {
+    return null;
+  }
+};

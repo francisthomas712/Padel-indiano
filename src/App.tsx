@@ -84,7 +84,10 @@ import {
 } from './utils/localStorage';
 import {
   Group,
+  decodeGroup,
   deleteGroup as deleteGroupRecord,
+  encodeGroup,
+  findGroup,
   loadGroups,
   normalizeGroupName,
   saveGroup
@@ -227,9 +230,27 @@ const App: React.FC = () => {
   // Courts picker shown alongside Start Tournament (defaults to 2)
   const [pendingCourts, setPendingCourts] = useState(2);
 
-  // Deep-link spectator space: …/#/watch/<groupName>
+  // Deep-link handlers: …/#/watch/<name> spectates, …/#/group/<code> imports a group
   useEffect(() => {
     const applyHash = () => {
+      // Group share link: carries the full group payload (works across devices)
+      const groupMatch = window.location.hash.match(/^#\/group\/([A-Za-z0-9_-]+)$/);
+      if (groupMatch) {
+        const imported = decodeGroup(groupMatch[1]);
+        if (imported) {
+          const existing = findGroup(imported.name);
+          if (!existing || window.confirm(`Group "${imported.name}" already exists on this device. Replace it with the shared version?`)) {
+            saveGroup(imported.name, imported.players, imported.settings, imported.name);
+            setGroups(loadGroups());
+            toast.success(`Group "${imported.name}" added to this device!`);
+          }
+        } else {
+          toast.error('That group link is invalid or corrupted');
+        }
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+
       const match = window.location.hash.match(/^#\/watch\/([A-Za-z0-9_-]+)/);
       setWatchKey(match ? match[1].toLowerCase() : null);
       if (match) setSpectatorOpen(true);
@@ -244,6 +265,15 @@ const App: React.FC = () => {
     const url = `${window.location.origin}${window.location.pathname}#/watch/${normalizeGroupName(groupName)}`;
     navigator.clipboard?.writeText(url).then(
       () => toast.success('Watch link copied — anyone on this device can open it'),
+      () => toast(url, { icon: '🔗' })
+    );
+  }, []);
+
+  // Shareable link carrying the whole group (players + ELOs) to another device
+  const handleShareGroup = useCallback((group: Group) => {
+    const url = `${window.location.origin}${window.location.pathname}#/group/${encodeGroup(group)}`;
+    navigator.clipboard?.writeText(url).then(
+      () => toast.success(`Link copied — open it on any device to add "${group.name}"`),
       () => toast(url, { icon: '🔗' })
     );
   }, []);
@@ -1499,6 +1529,14 @@ const App: React.FC = () => {
                               <span className="text-slate-400 font-normal"> · {group.players.length}p</span>
                             </button>
                             <button
+                              onClick={() => handleShareGroup(group)}
+                              className="w-6 h-6 rounded-full text-slate-400 hover:text-emerald-400 hover:bg-slate-600 text-xs transition-colors touch-target"
+                              aria-label={`Share ${group.name} to another device`}
+                              title="Copy link to open this group on another device"
+                            >
+                              🔗
+                            </button>
+                            <button
                               onClick={() => handleDeleteGroup(group.name)}
                               className="w-6 h-6 rounded-full text-slate-400 hover:text-red-400 hover:bg-slate-600 text-xs font-bold transition-colors touch-target"
                               aria-label={`Delete group ${group.name}`}
@@ -2119,6 +2157,13 @@ const App: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
+                            <button
+                              onClick={() => handleShareGroup(group)}
+                              className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 flex items-center gap-2 text-sm"
+                              title="Copy link to open this group on another device"
+                            >
+                              🔗 Share
+                            </button>
                             <button
                               onClick={() => handleLoadGroup(group)}
                               className="px-4 py-2 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 text-sm"
