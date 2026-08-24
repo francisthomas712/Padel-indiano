@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import {
   Trophy,
@@ -28,7 +28,7 @@ import { Leaderboard } from './components/Leaderboard';
 import { MatchCard } from './components/MatchCard';
 import { Settings } from './components/Settings';
 import { CourtMode } from './components/CourtMode';
-import { SpectatorMode } from './components/SpectatorMode';
+import { SpectatorMode, LiveScoreboard } from './components/SpectatorMode';
 
 // Types
 import {
@@ -43,7 +43,7 @@ import {
 } from './types';
 
 // Utils
-import { generatePairs, matchPairs, findPlayersToSitOut } from './utils/pairingAlgorithm';
+import { generatePairs, generateSnakePairs, matchPairs, findPlayersToSitOut } from './utils/pairingAlgorithm';
 import {
   getPointDisplay,
   checkMatchWinner,
@@ -67,11 +67,13 @@ import {
   shareResults
 } from './utils/export';
 import {
-  TournamentTemplate,
-  saveTemplate,
-  loadTemplates,
-  deleteTemplate
-} from './utils/localStorage';
+  Group,
+  deleteGroup as deleteGroupRecord,
+  loadGroups,
+  normalizeGroupName,
+  saveGroup
+} from './utils/groups';
+import { sortForFinalsSeeding } from './utils/tieBreaking';
 
 interface EditingMatch {
   roundId: number;
@@ -102,9 +104,9 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('tournament');
   const [leaderboardMode, setLeaderboardMode] = useState<LeaderboardMode>('ppg');
   const [editingMatch, setEditingMatch] = useState<EditingMatch | null>(null);
-  const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
+  const [groups, setGroups] = useState<Record<string, Group>>({});
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupNameInput, setGroupNameInput] = useState('');
   const [showCustomRound, setShowCustomRound] = useState(false);
   const [customPlayer1, setCustomPlayer1] = useState('');
   const [customPlayer2, setCustomPlayer2] = useState('');
@@ -113,6 +115,28 @@ const App: React.FC = () => {
   const [courtModeTarget, setCourtModeTarget] = useState<EditingMatch | null>(null);
   const [finalsCourtOpen, setFinalsCourtOpen] = useState(false);
   const [spectatorOpen, setSpectatorOpen] = useState(false);
+  const [watchKey, setWatchKey] = useState<string | null>(null);
+
+  // Deep-link spectator space: …/#/watch/<groupName>
+  useEffect(() => {
+    const applyHash = () => {
+      const match = window.location.hash.match(/^#\/watch\/([A-Za-z0-9_-]+)/);
+      setWatchKey(match ? match[1].toLowerCase() : null);
+      if (match) setSpectatorOpen(true);
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, []);
+
+  // Shareable link to this group's spectator space
+  const handleShareWatch = useCallback((groupName: string) => {
+    const url = `${window.location.origin}${window.location.pathname}#/watch/${normalizeGroupName(groupName)}`;
+    navigator.clipboard?.writeText(url).then(
+      () => toast.success('Watch link copied — anyone on this device can open it'),
+      () => toast(url, { icon: '🔗' })
+    );
+  }, []);
 
   // Derived settings flags (optional fields for backward compatibility with saved data)
   const winByTwo = state.settings.winByTwo ?? false;
@@ -126,9 +150,9 @@ const App: React.FC = () => {
     finalsCourtOpen;
   useWakeLock(state.tournamentStarted && hasActivePlay);
 
-  // Load templates on mount
+  // Load groups on mount
   useEffect(() => {
-    setTemplates(loadTemplates());
+    setGroups(loadGroups());
   }, []);
 
   // Initialize partnership and opposition history for a player
@@ -259,8 +283,12 @@ const App: React.FC = () => {
       playersToMatch = playersToMatch.filter(p => !sitOuts.some(s => s.id === p.id));
     }
 
-    // Generate pairs
-    const pairs = generatePairs(playersToMatch, state.partnershipHistory);
+    // Every third round (3rd, 6th, ...), use snake pairing so strong players
+    // mix with the whole group; otherwise variety-driven greedy pairing
+    const useSnake = state.rounds.length % 3 === 2;
+    const pairs = useSnake
+      ? generateSnakePairs(playersToMatch)
+      : generatePairs(playersToMatch, state.partnershipHistory);
 
     if (pairs.length < 2) {
       toast.error('Not enough players to form matches');
@@ -272,6 +300,17 @@ const App: React.FC = () => {
       .map((match, index) => ({ ...match, court: index + 1 }));
 
     if (matches.length > 0) {
+      // Credit sit-outs immediately so the next round's picker sees fresh counts
+      // and nobody sits out twice in a row.
+      const sitOutPlayers = sittingOut === null
+        ? []
+        : 'players' in sittingOut ? sittingOut.players : [sittingOut];
+      const playersWithSitOuts = state.players.map(p =>
+        sitOutPlayers.some(s => s.id === p.id)
+          ? { ...p, sitOutCount: p.sitOutCount + 1 }
+          : p
+      );
+
       const newRound: Round = {
         id: state.rounds.length,
         matches,
@@ -280,7 +319,7 @@ const App: React.FC = () => {
       };
 
       updateState(
-        { rounds: [...state.rounds, newRound] },
+        { rounds: [...state.rounds, newRound], players: playersWithSitOuts },
         {
           type: 'round_generate',
           timestamp: Date.now(),
@@ -442,21 +481,22 @@ const App: React.FC = () => {
     const pair1Elo = calculatePairRating(pair1Players[0].eloRating, pair1Players[1].eloRating);
     const pair2Elo = calculatePairRating(pair2Players[0].eloRating, pair2Players[1].eloRating);
 
-    // Calculate weighted points based on opponent strength
-    // Round to 1 decimal place to match display precision and ensure accurate PPG calculations
-    const pair1WeightedPoints = Math.round(calculateWeightedPoints(match.score1, pair1Elo, pair2Elo) * 10) / 10;
-    const pair2WeightedPoints = Math.round(calculateWeightedPoints(match.score2, pair2Elo, pair1Elo) * 10) / 10;
-
-    // Determine winner for ELO update
+    // Winner by raw score (drives both weighting and margin-aware ELO)
     const pair1Won = match.score1 > match.score2;
 
-    // Update ELO ratings for all players
+    // Calculate weighted points based on opponent strength and result
+    // Round to 1 decimal place to match display precision and ensure accurate PPG calculations
+    const pair1WeightedPoints = Math.round(calculateWeightedPoints(match.score1, pair1Elo, pair2Elo, pair1Won) * 10) / 10;
+    const pair2WeightedPoints = Math.round(calculateWeightedPoints(match.score2, pair2Elo, pair1Elo, !pair1Won) * 10) / 10;
+
+    // Update ELO ratings for all players (margin-aware, provisional K for new players)
     const newEloRatings = updateMatchElo(
-      { id: pair1Players[0].id, rating: pair1Players[0].eloRating },
-      { id: pair1Players[1].id, rating: pair1Players[1].eloRating },
-      { id: pair2Players[0].id, rating: pair2Players[0].eloRating },
-      { id: pair2Players[1].id, rating: pair2Players[1].eloRating },
-      pair1Won
+      { id: pair1Players[0].id, rating: pair1Players[0].eloRating, matchesPlayed: pair1Players[0].matchesPlayed },
+      { id: pair1Players[1].id, rating: pair1Players[1].eloRating, matchesPlayed: pair1Players[1].matchesPlayed },
+      { id: pair2Players[0].id, rating: pair2Players[0].eloRating, matchesPlayed: pair2Players[0].matchesPlayed },
+      { id: pair2Players[1].id, rating: pair2Players[1].eloRating, matchesPlayed: pair2Players[1].matchesPlayed },
+      match.score1,
+      match.score2
     );
 
     // Update pair 1 players with weighted points and new ELO
@@ -483,18 +523,8 @@ const App: React.FC = () => {
       }
     });
 
-    // Update sit-out count
-    if (round.sittingOut) {
-      if ('players' in round.sittingOut) {
-        round.sittingOut.players.forEach(p => {
-          const player = updatedPlayers.find(pl => pl.id === p.id);
-          if (player) player.sitOutCount = (player.sitOutCount || 0) + 1;
-        });
-      } else {
-        const player = updatedPlayers.find(p => p.id === round.sittingOut!.id);
-        if (player) player.sitOutCount = (player.sitOutCount || 0) + 1;
-      }
-    }
+    // Note: sit-out counts are credited at round generation (generateNextRound),
+    // not here, so the sitter picker always sees fresh counts.
 
     // Update partnership history
     const newPartnershipHistory = { ...state.partnershipHistory };
@@ -861,7 +891,8 @@ const App: React.FC = () => {
       .map(p => ({
         ...p,
         ppg: p.matchesPlayed > 0 ? (p.points / p.matchesPlayed).toFixed(2) : '0.00',
-        winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0'
+        winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0',
+        eloDelta: p.eloRating - p.initialElo
       }));
 
     if (leaderboardMode === 'elo') {
@@ -891,30 +922,23 @@ const App: React.FC = () => {
   // Initiate finals
   const initiateFinals = useCallback(() => {
     // Get top 4 players by weighted PPG (not current leaderboard mode)
-    // Only include active players who have played matches
+    // Only include active players who have played matches.
+    // Seeding uses the same canonical tie-break chain as the leaderboard.
     const playersWithStats = state.players
       .filter(p => p.matchesPlayed > 0 && p.active)
       .map(p => ({
         ...p,
         ppg: p.matchesPlayed > 0 ? (p.points / p.matchesPlayed).toFixed(2) : '0.00',
-        winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0'
-      }))
-      .sort((a, b) => {
-        // Sort by weighted PPG (highest first)
-        const ppgDiff = parseFloat(b.ppg) - parseFloat(a.ppg);
-        if (Math.abs(ppgDiff) > 0.001) return ppgDiff;
-        // Tiebreaker: total points
-        if (b.points !== a.points) return b.points - a.points;
-        // Second tiebreaker: ELO
-        return b.eloRating - a.eloRating;
-      });
+        winRate: p.matchesPlayed > 0 ? ((p.wins / p.matchesPlayed) * 100).toFixed(1) : '0.0',
+        eloDelta: p.eloRating - p.initialElo
+      }));
 
     if (playersWithStats.length < 4) {
       toast.error('Need at least 4 active players who have played matches to start finals');
       return;
     }
 
-    const top4 = playersWithStats.slice(0, 4);
+    const top4 = sortForFinalsSeeding(playersWithStats, state.rounds).slice(0, 4);
 
     const finals: FinalsMatch = {
       id: 'finals',
@@ -941,7 +965,7 @@ const App: React.FC = () => {
     });
 
     toast.success('Finals initiated!');
-  }, [state.players, updateState]);
+  }, [state.players, state.rounds, updateState]);
 
   // Update finals score
   const updateFinalsScore = useCallback((team: 1 | 2, delta: number) => {
@@ -1053,35 +1077,47 @@ const App: React.FC = () => {
     }
   }, [getLeaderboard]);
 
-  // Template functions
-  const handleSaveTemplate = useCallback(() => {
-    if (!newTemplateName.trim()) {
-      toast.error('Please enter a template name');
+  // Group functions — named, unique player sets with historical ELOs
+  const openGroupModal = useCallback(() => {
+    setGroupNameInput(state.groupName ?? '');
+    setShowGroupModal(true);
+  }, [state.groupName]);
+
+  const handleSaveGroup = useCallback(() => {
+    if (state.players.length === 0) {
+      toast.error('Add players before saving a group');
       return;
     }
 
-    const template: TournamentTemplate = {
-      id: Date.now().toString(),
-      name: newTemplateName.trim(),
-      players: state.players.map(p => ({ name: p.name, avatar: p.avatar })),
-      settings: state.settings,
-      createdAt: Date.now()
-    };
+    const result = saveGroup(
+      groupNameInput,
+      state.players.map(p => ({ name: p.name, eloRating: p.eloRating, avatar: p.avatar })),
+      state.settings,
+      state.groupName
+    );
 
-    saveTemplate(template);
-    setTemplates(loadTemplates());
-    setNewTemplateName('');
-    setShowTemplateModal(false);
-    toast.success('Template saved!');
-  }, [newTemplateName, state.players, state.settings]);
-
-  const handleLoadTemplate = useCallback((template: TournamentTemplate) => {
-    if (state.tournamentStarted && !window.confirm('Loading a template will reset the current tournament. Continue?')) {
+    if (!result.ok) {
+      toast.error(result.error === 'name-taken'
+        ? 'That name belongs to another group — names must be unique'
+        : 'Use a single word (letters, numbers, - or _) up to 24 characters');
       return;
     }
 
-    const players: Player[] = template.players.map(p => ({
-      id: Date.now().toString() + Math.random(),
+    setGroups(loadGroups());
+    updateState({ groupName: result.group.name });
+    setShowGroupModal(false);
+    toast.success(`Group "${result.group.name}" saved!`);
+  }, [groupNameInput, state.players, state.settings, state.groupName, updateState]);
+
+  const handleLoadGroup = useCallback((group: Group) => {
+    if (state.tournamentStarted && !window.confirm(`Loading "${group.name}" will reset the current tournament. Continue?`)) {
+      return;
+    }
+
+    // Stable IDs (group key + player name) so reloading the same group
+    // keeps player identity consistent across sessions.
+    const players: Player[] = group.players.map(p => ({
+      id: `${group.key}-${normalizeGroupName(p.name)}`,
       name: p.name,
       avatar: p.avatar,
       points: 0,
@@ -1090,37 +1126,75 @@ const App: React.FC = () => {
       losses: 0,
       active: true,
       sitOutCount: 0,
-      eloRating: INITIAL_ELO,
-      initialElo: INITIAL_ELO
+      eloRating: p.eloRating,
+      initialElo: p.eloRating
     }));
 
     updateState({
       players,
-      settings: template.settings,
+      settings: group.settings ?? state.settings,
       rounds: [],
       tournamentStarted: false,
       partnershipHistory: {},
       oppositionHistory: {},
       finalsMode: false,
-      finalsMatch: null
+      finalsMatch: null,
+      groupName: group.name
     });
 
-    toast.success(`Template "${template.name}" loaded!`);
-  }, [state.tournamentStarted, updateState]);
+    toast.success(`Group "${group.name}" loaded!`);
+  }, [state.tournamentStarted, state.settings, updateState]);
 
-  const handleDeleteTemplate = useCallback((templateId: string) => {
-    if (!window.confirm('Delete this template?')) return;
-    deleteTemplate(templateId);
-    setTemplates(loadTemplates());
-    toast.success('Template deleted');
+  const handleDeleteGroup = useCallback((name: string) => {
+    if (!window.confirm(`Delete group "${name}"? Its players and ELO history will be removed.`)) return;
+    deleteGroupRecord(name);
+    setGroups(loadGroups());
+    toast.success('Group deleted');
   }, []);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onUndo: canUndo ? undo : undefined,
     onRedo: canRedo ? redo : undefined,
-    onSave: () => setShowTemplateModal(true)
+    onSave: openGroupModal
   });
+
+  // Live scoreboards for the spectator space (in-progress matches + finals)
+  const liveBoards = useMemo<LiveScoreboard[]>(() => {
+    const boards: LiveScoreboard[] = [];
+    state.rounds.forEach(round => {
+      round.matches.forEach(match => {
+        if (match.completed) return;
+        boards.push({
+          id: match.id,
+          title: `Court ${match.court ?? '?'}`,
+          team1Name: match.pair1.name ?? match.pair1.players.map(p => p.name).join(' & '),
+          team2Name: match.pair2.name ?? match.pair2.players.map(p => p.name).join(' & '),
+          score1: match.score1,
+          score2: match.score2,
+          pointsToWin: state.settings.pointsToWin,
+          serverName: resolveServerName(match.currentServer as ServerPosition | undefined, match.pair1, match.pair2)
+        });
+      });
+    });
+    if (state.finalsMode && state.finalsMatch && !state.finalsMatch.completed) {
+      boards.push({
+        id: 'finals',
+        title: '🏆 Finals',
+        team1Name: state.finalsMatch.pair1.name ?? state.finalsMatch.pair1.players.map(p => p.name).join(' & '),
+        team2Name: state.finalsMatch.pair2.name ?? state.finalsMatch.pair2.players.map(p => p.name).join(' & '),
+        score1: state.finalsMatch.score1,
+        score2: state.finalsMatch.score2,
+        pointsToWin: state.settings.pointsToWin,
+        serverName: resolveServerName(
+          state.finalsMatch.currentServer as ServerPosition | undefined,
+          state.finalsMatch.pair1,
+          state.finalsMatch.pair2
+        )
+      });
+    }
+    return boards;
+  }, [state.rounds, state.finalsMode, state.finalsMatch, state.settings.pointsToWin]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
@@ -1140,8 +1214,18 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Undo/Redo buttons */}
+            {/* Undo/Redo + Save Group buttons */}
             <div className="flex gap-2">
+              {state.players.length > 0 && (
+                <button
+                  onClick={openGroupModal}
+                  className="p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:shadow-lg flex items-center gap-1.5 px-3"
+                  title="Save group (Ctrl+S) — stores these players and their current ELOs"
+                >
+                  <Save className="w-5 h-5" />
+                  {state.groupName && <span className="text-sm font-semibold">{state.groupName}</span>}
+                </button>
+              )}
               <button
                 onClick={undo}
                 disabled={!canUndo}
@@ -1204,13 +1288,57 @@ const App: React.FC = () => {
                     <Play className="w-5 h-5" />
                     Start Tournament
                   </button>
-                  <button
-                    onClick={() => setShowTemplateModal(true)}
-                    className="px-6 py-3 bg-slate-700/300 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 font-semibold transition-colors"
-                    title="Save as template (Ctrl+S)"
-                  >
-                    <Save className="w-5 h-5" />
-                  </button>
+                </div>
+              )}
+
+              {/* Groups bar — save/load recurring player sets */}
+              {!state.tournamentStarted && (
+                <div className="mb-6 bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-200">Groups</div>
+                      <div className="text-xs text-slate-400">
+                        Save your player set + their ELOs under a one-word name (e.g. Pawri), reload it next time.
+                      </div>
+                    </div>
+                    <button
+                      onClick={openGroupModal}
+                      disabled={state.players.length === 0}
+                      className="px-4 py-2 bg-emerald-500/90 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-semibold transition-colors"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save current as Group
+                    </button>
+                  </div>
+
+                  {Object.keys(groups).length > 0 && (
+                    <div className="flex gap-2 flex-wrap mt-3">
+                      {Object.values(groups)
+                        .sort((a, b) => b.updatedAt - a.updatedAt)
+                        .map(group => (
+                          <span
+                            key={group.key}
+                            className="inline-flex items-center gap-1 pl-3 pr-1 py-1 bg-slate-700 border border-slate-600 rounded-full"
+                          >
+                            <button
+                              onClick={() => handleLoadGroup(group)}
+                              className="text-sm font-semibold text-slate-100 hover:text-emerald-400 transition-colors"
+                              title={`Load ${group.players.length} players (ELOs preserved)`}
+                            >
+                              {group.name}
+                              <span className="text-slate-400 font-normal"> · {group.players.length}p</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteGroup(group.name)}
+                              className="w-6 h-6 rounded-full text-slate-400 hover:text-red-400 hover:bg-slate-600 text-xs font-bold transition-colors touch-target"
+                              aria-label={`Delete group ${group.name}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1758,47 +1886,54 @@ const App: React.FC = () => {
                 disabled={state.tournamentStarted}
               />
 
-              {/* Template Management */}
+              {/* Group Management */}
               <div className="bg-slate-800 rounded-lg p-6">
-                <h3 className="text-xl font-bold text-slate-200 mb-4">Templates</h3>
+                <h3 className="text-xl font-bold text-slate-200 mb-4">Groups</h3>
+                <p className="text-sm text-slate-400 mb-4">
+                  A Group is a named set of players and their historical ELOs — save once
+                  (Ctrl+S), reload it every time you play.
+                </p>
 
                 <button
-                  onClick={() => setShowTemplateModal(true)}
-                  className="w-full py-3 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-2 font-semibold mb-4"
+                  onClick={openGroupModal}
+                  disabled={state.players.length === 0}
+                  className="w-full py-3 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold mb-4"
                 >
                   <Save className="w-5 h-5" />
-                  Save Current Setup as Template
+                  Save Current Setup as Group
                 </button>
 
-                {templates.length === 0 ? (
-                  <p className="text-slate-400 text-center py-4">No templates saved yet</p>
+                {Object.keys(groups).length === 0 ? (
+                  <p className="text-slate-400 text-center py-4">No groups saved yet</p>
                 ) : (
                   <div className="space-y-2">
-                    {templates.map(template => (
-                      <div key={template.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
-                        <div>
-                          <div className="font-semibold text-slate-200">{template.name}</div>
-                          <div className="text-sm text-slate-400">
-                            {template.players.length} players • {new Date(template.createdAt).toLocaleDateString()}
+                    {Object.values(groups)
+                      .sort((a, b) => b.updatedAt - a.updatedAt)
+                      .map(group => (
+                        <div key={group.key} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                          <div>
+                            <div className="font-semibold text-slate-200">{group.name}</div>
+                            <div className="text-sm text-slate-400">
+                              {group.players.length} players • updated {new Date(group.updatedAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleLoadGroup(group)}
+                              className="px-4 py-2 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 text-sm"
+                            >
+                              <Upload className="w-4 h-4" />
+                              Load
+                            </button>
+                            <button
+                              onClick={() => handleDeleteGroup(group.name)}
+                              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleLoadTemplate(template)}
-                            className="px-4 py-2 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 text-sm"
-                          >
-                            <Upload className="w-4 h-4" />
-                            Load
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
@@ -1807,30 +1942,40 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Template Save Modal */}
-      {showTemplateModal && (
+      {/* Group Save Modal */}
+      {showGroupModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700 shadow-2xl">
-            <h3 className="text-2xl font-bold text-slate-100 mb-4">Save Template</h3>
+            <h3 className="text-2xl font-bold text-slate-100 mb-1">Save Group</h3>
+            <p className="text-sm text-slate-400 mb-4">
+              Stores all {state.players.length} players with their current ELOs under a one-word name.
+              {state.groupName && normalizeGroupName(groupNameInput) === normalizeGroupName(state.groupName) && (
+                <> Updating <span className="text-emerald-400 font-semibold">{state.groupName}</span>.</>
+              )}
+            </p>
             <input
               type="text"
-              value={newTemplateName}
-              onChange={(e) => setNewTemplateName(e.target.value)}
-              placeholder="Template name"
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder-slate-400 mb-4"
+              value={groupNameInput}
+              onChange={(e) => setGroupNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGroup(); }}
+              placeholder="e.g. Pawri"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-100 placeholder-slate-400 mb-2"
               autoFocus
             />
+            <p className="text-xs text-slate-500 mb-4">
+              One word only — letters, numbers, - or _ (max 24). Names are unique: you can't save over a different group.
+            </p>
             <div className="flex gap-2">
               <button
-                onClick={handleSaveTemplate}
+                onClick={handleSaveGroup}
                 className="flex-1 py-2 bg-emerald-500/100 text-white rounded-lg hover:bg-green-600 font-semibold"
               >
                 Save
               </button>
               <button
                 onClick={() => {
-                  setShowTemplateModal(false);
-                  setNewTemplateName('');
+                  setShowGroupModal(false);
+                  setGroupNameInput('');
                 }}
                 className="flex-1 py-2 bg-slate-700/300 text-white rounded-lg hover:bg-gray-600 font-semibold"
               >
@@ -1894,9 +2039,13 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Fullscreen spectator leaderboard */}
+      {/* Fullscreen spectator space for this device's session / watch links */}
       <SpectatorMode
         isOpen={spectatorOpen}
+        watchKey={watchKey}
+        sessionGroupName={state.groupName ?? null}
+        groups={groups}
+        liveBoards={liveBoards}
         leaderboard={getLeaderboard()}
         mode={leaderboardMode}
         onModeChange={setLeaderboardMode}
@@ -1907,7 +2056,14 @@ const App: React.FC = () => {
             return lastRound.sittingOut ? `🪑 ${lastRound.sittingOut.name}` : null;
           })()
         }
-        onClose={() => setSpectatorOpen(false)}
+        onShareWatch={handleShareWatch}
+        onClose={() => {
+          setSpectatorOpen(false);
+          setWatchKey(null);
+          if (window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }}
       />
     </div>
   );

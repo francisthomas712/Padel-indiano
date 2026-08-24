@@ -47,7 +47,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const serverPair = serverInfo.pair === 1 ? match.pair1 : match.pair2;
   const serverName = serverPair.players[serverInfo.slot]?.name;
 
-  // Calculate ELO-based point multipliers
+  // Calculate ELO-based point multipliers (result-aware: use current scores as the implied result)
   const pair1Elo = calculatePairRating(
     match.pair1.players[0].eloRating,
     match.pair1.players[1].eloRating
@@ -57,11 +57,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     match.pair2.players[1].eloRating
   );
 
-  const pair1Multiplier = calculatePointMultiplier(pair1Elo, pair2Elo);
-  const pair2Multiplier = calculatePointMultiplier(pair2Elo, pair1Elo);
+  const pair1Won = match.score1 >= match.score2;
+  const pair1Multiplier = calculatePointMultiplier(pair1Elo, pair2Elo, pair1Won);
+  const pair2Multiplier = calculatePointMultiplier(pair2Elo, pair1Elo, !pair1Won);
 
   // Use stored weighted points if available (from when match was completed)
-  // Otherwise calculate from current ELO ratings
+  // Otherwise calculate a live preview from current ELO ratings
   const pair1WeightedPoints = match.weightedPoints1 ?? Math.round(match.score1 * pair1Multiplier * 10) / 10;
   const pair2WeightedPoints = match.weightedPoints2 ?? Math.round(match.score2 * pair2Multiplier * 10) / 10;
 

@@ -55,6 +55,8 @@ export interface FinalsMatch {
 export interface PlayerWithStats extends Player {
   ppg: string;
   winRate: string;
+  /** Rating change since the group's starting ELO (shown as +/- on leaderboards) */
+  eloDelta?: number;
 }
 
 export interface PartnershipHistory {
@@ -87,6 +89,8 @@ export interface TournamentState {
   finalsMode: boolean;
   finalsMatch: FinalsMatch | null;
   settings: TournamentSettings;
+  /** One-word name of the Group this session belongs to (e.g. "Pawri") */
+  groupName?: string;
 }
 
 export interface HistoryEntry {

@@ -67,11 +67,25 @@ This ensures:
 ### Leaderboard Rankings
 Players are ranked by:
 1. **Points Per Game (PPG)** - Primary ranking method
-2. Head-to-head record (if tied on PPG)
-3. Win rate percentage
-4. Strength of schedule (quality of opponents)
-5. Total matches played
-6. Total points scored
+2. Win rate percentage
+3. Overall point differential (points won minus conceded)
+4. Head-to-head record (if still tied)
+5. Head-to-head point differential
+6. Strength of schedule (quality of opponents)
+7. Total matches played, then total points scored
+
+### Weighted Points & ELO
+
+- **Weighted points** are earned at match completion and depend on both the
+  opponent's strength *and* the result: facing stronger opponents boosts your
+  multiplier, but on a loss only half of that adjustment is kept
+  (`LOSER_MULTIPLIER_WEIGHT = 0.5`), so a tough narrow loss can't out-earn
+  winning at the same level of opposition.
+- **ELO updates are margin-aware**: ratings move by point share
+  (e.g., 7-6 barely moves them, 7-0 moves them a lot), and players in their
+  first 3 matches use a higher K-factor so starting ratings converge quickly.
+- Every third round uses **snake pairing** (strongest partners weakest) so
+  strong players regularly face the whole group instead of only their tier.
 
 ### Finals
 - Top 4 players compete: 1st+4th vs 2nd+3rd
@@ -139,6 +153,18 @@ Losing team players each earn: 9 points
 2. **Standard Play**: Keep default 7 points for balanced games
 3. **Competitive**: Use 11-21 points for more decisive matches
 4. **Time Management**: Lower points = more rounds possible in limited time
+
+## Groups (Recurring Player Sets)
+
+Hit **Save** (or Ctrl+S) during setup to store all current players *with their
+current ELOs* under a unique one-word name (e.g. `Pawri`). Next tournament,
+load the group from the Groups bar — no re-adding players, no losing rating
+history. Names are one word (letters/digits/`-`/`_`, max 24) and globally
+unique; saving again under your own group's name updates it mid-season.
+
+Spectators get a dedicated space per group too: open
+`<site-url>/#/watch/Pawri` on any device holding that saved group to see live
+scores and standings fullscreen.
 
 ## Differences from Traditional Padel
 

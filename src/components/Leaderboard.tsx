@@ -125,6 +125,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 </div>
                 <div className="text-xs text-slate-400 font-medium">
                   {mode === 'elo' ? 'ELO' : mode === 'ppg' ? 'PPG' : 'PTS'}
+                  {player.eloDelta !== undefined && player.eloDelta !== 0 && (
+                    <span className={`ml-1 ${player.eloDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {player.eloDelta > 0 ? '+' : ''}{player.eloDelta}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

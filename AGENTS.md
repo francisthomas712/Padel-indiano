@@ -24,7 +24,8 @@ A client-only React SPA that manages "Padel Indiano" tournaments (Mexican-style 
 - `src/utils/elo.ts` — ELO math (`INITIAL_ELO = 1500`, `K_FACTOR = 32`) and the weighted-points multiplier (clamped 0.5×–1.5×).
 - `src/utils/tieBreaking.ts` — 7-level leaderboard tie-breaking.
 - `src/utils/localStorage.ts` — persistence; keys: `padel-indiano-tournament`, `-templates`, `-history`, `-version`.
-- `src/components/` — `PlayerList`, `Leaderboard`, `MatchCard`, `Settings`, `Toast`, `PlayerAvatar`.
+- `src/utils/groups.ts` — named Groups (unique one-word player sets + historical ELOs); key: `padel-indiano-groups`. Independent of state versioning.
+- `src/components/` — `PlayerList`, `Leaderboard`, `MatchCard`, `Settings`, `Toast`, `PlayerAvatar`, `CourtMode` (fullscreen scoring), `SpectatorMode` (live boards + watch deep links).
 - `padel-indiano.js` (repo root) — the legacy pre-refactor single-file app. Reference only; **do not edit or import it**.
 - Docs: `README.md`, `SCORING_GUIDE.md` (domain rules), `DEPLOYMENT.md`, `IMPROVEMENTS.md` (refactor history).
 
@@ -46,6 +47,9 @@ There is no formatter configured (no Prettier). Match the surrounding style.
 ## Patterns
 
 - **State mutations** go through `updateState(updates, historyEntry?)` from `useTournamentState`. Pass a `HistoryEntry` for any user-visible action so undo/redo works; snapshot state via the entry's `previousState`.
+- **Sit-out counts are credited at round generation**, not at match completion — `generateNextRound` applies `sitOutCount + 1` when creating the round so the sitter picker never sees stale counts.
+- **Finals seeding must go through `sortForFinalsSeeding()`** (same chain as the leaderboard). Don't write ad-hoc sort comparators for qualification.
+- **Group names are case-insensitively unique**; enforce via `saveGroup()`'s `name-taken` result rather than custom checks.
 - **Weighted points are stored, not recomputed.** At match completion, `weightedPoints1/2` are calculated from the ELO diff *at that moment* and saved on the `Match`. Everywhere else, read them with the fallback `match.weightedPoints1 ?? match.score1`. Never recalculate them from current ELO ratings for display or reversal.
 - **Tests** live in `src/utils/__tests__/*.test.ts` next to the util they cover (see `elo.test.ts`, `scoring.test.ts`). Vitest `globals: true` is on, but existing tests still import from `vitest` explicitly — follow that. Pure utils (scoring, elo, pairing, tieBreaking) are unit-testable by design; keep new logic in `src/utils/` so it stays testable.
 - **Path alias**: `@/*` maps to `./src/*`.
