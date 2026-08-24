@@ -29,6 +29,7 @@ import { MatchCard } from './components/MatchCard';
 import { Settings } from './components/Settings';
 import { CourtMode } from './components/CourtMode';
 import { SpectatorMode, LiveScoreboard } from './components/SpectatorMode';
+import { WelcomeScreen } from './components/WelcomeScreen';
 
 // Types
 import {
@@ -66,6 +67,13 @@ import {
   downloadTextFile,
   shareResults
 } from './utils/export';
+import {
+  loadSavedRole,
+  loadSavedWatchName,
+  saveRole,
+  saveWatchName,
+  UserRole
+} from './utils/localStorage';
 import {
   Group,
   deleteGroup as deleteGroupRecord,
@@ -107,6 +115,9 @@ const App: React.FC = () => {
   const [groups, setGroups] = useState<Record<string, Group>>({});
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState('');
+  // First-run gate: null until we've checked localStorage for a saved role
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [onboarded, setOnboarded] = useState(false);
   const [showCustomRound, setShowCustomRound] = useState(false);
   const [customPlayer1, setCustomPlayer1] = useState('');
   const [customPlayer2, setCustomPlayer2] = useState('');
@@ -150,10 +161,39 @@ const App: React.FC = () => {
     finalsCourtOpen;
   useWakeLock(state.tournamentStarted && hasActivePlay);
 
-  // Load groups on mount
+  // Load groups on mount + restore saved role (skip welcome gate for returning users)
   useEffect(() => {
     setGroups(loadGroups());
+    const savedRole = loadSavedRole();
+    if (savedRole) {
+      setRole(savedRole);
+      setOnboarded(true);
+      if (savedRole === 'spectator') {
+        const savedWatch = loadSavedWatchName();
+        if (savedWatch) {
+          setWatchKey(normalizeGroupName(savedWatch));
+          setSpectatorOpen(true);
+        }
+      }
+    }
   }, []);
+
+  // First-run gate: link this device to a one-word group name, pick a role
+  const handleJoin = useCallback((groupName: string, joinedRole: 'admin' | 'spectator') => {
+    setRole(joinedRole);
+    saveRole(joinedRole);
+    setOnboarded(true);
+
+    if (joinedRole === 'spectator') {
+      saveWatchName(groupName);
+      setWatchKey(normalizeGroupName(groupName));
+      setSpectatorOpen(true);
+    } else {
+      // Tag the session with the group name (players can still be loaded/added)
+      updateState({ groupName });
+      toast.success(`Running "${groupName}" — add players or load a group below`);
+    }
+  }, [updateState]);
 
   // Initialize partnership and opposition history for a player
   const initializePlayerHistory = useCallback((playerId: string) => {
@@ -221,17 +261,48 @@ const App: React.FC = () => {
   const removePlayer = useCallback((playerId: string) => {
     const player = state.players.find(p => p.id === playerId);
     if (!player) return;
+    if (!window.confirm(`Remove ${player.name}?`)) return;
 
     updateState(
       { players: state.players.filter(p => p.id !== playerId) },
       {
-        type: 'player_add',
+        type: 'player_delete',
         timestamp: Date.now(),
         data: { removed: true, playerId }
       }
     );
 
     toast.success(`Removed ${player.name}`);
+  }, [state.players, updateState]);
+
+  // Edit a player's name and/or starting ELO (only before tournament starts).
+  // Changing the ELO resets their rating baseline (initialElo) so the +/- delta stays honest.
+  const editPlayer = useCallback((playerId: string, name: string, elo: number) => {
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+
+    const updates: Partial<Player> = { name: trimmed };
+    if (elo !== player.initialElo) {
+      updates.initialElo = elo;
+      updates.eloRating = elo; // rebaseline the rating when starting ELO changes
+    }
+
+    updateState(
+      { players: state.players.map(p => (p.id === playerId ? { ...p, ...updates } : p)) },
+      {
+        type: 'player_edit',
+        timestamp: Date.now(),
+        data: { playerId, name: trimmed, elo }
+      }
+    );
+
+    toast.success(`Updated ${trimmed}`);
   }, [state.players, updateState]);
 
   // Toggle player active/inactive status
@@ -1196,6 +1267,17 @@ const App: React.FC = () => {
     return boards;
   }, [state.rounds, state.finalsMode, state.finalsMatch, state.settings.pointsToWin]);
 
+  // First-run gate: everyone picks a group name and role before seeing the app
+  // (placed after all hooks so hook order stays stable across renders)
+  if (!onboarded) {
+    return (
+      <WelcomeScreen
+        knownGroupNames={Object.values(groups).sort((a, b) => b.updatedAt - a.updatedAt).map(g => g.name)}
+        onJoin={handleJoin}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <Toaster position="top-right" />
@@ -1274,6 +1356,7 @@ const App: React.FC = () => {
                 onNewPlayerEloChange={setNewPlayerElo}
                 onAddPlayer={addPlayer}
                 onRemovePlayer={removePlayer}
+                onEditPlayer={editPlayer}
                 onToggleActive={togglePlayerActive}
                 tournamentStarted={state.tournamentStarted}
               />
@@ -2062,6 +2145,10 @@ const App: React.FC = () => {
           setWatchKey(null);
           if (window.location.hash) {
             window.history.replaceState(null, '', window.location.pathname);
+          }
+          // Spectator devices go back to the join gate instead of the admin app
+          if (role === 'spectator') {
+            setOnboarded(false);
           }
         }}
       />

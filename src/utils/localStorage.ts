@@ -80,6 +80,44 @@ export const clearTournamentState = (): void => {
   }
 };
 
+const ROLE_KEY = 'padel-indiano-role';
+const WATCH_KEY = 'padel-indiano-watch';
+
+export type UserRole = 'admin' | 'spectator';
+
+export const loadSavedRole = (): UserRole | null => {
+  try {
+    const role = localStorage.getItem(ROLE_KEY);
+    return role === 'admin' || role === 'spectator' ? role : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveRole = (role: UserRole): void => {
+  try {
+    localStorage.setItem(ROLE_KEY, role);
+  } catch (error) {
+    console.error('Failed to save role:', error);
+  }
+};
+
+export const loadSavedWatchName = (): string | null => {
+  try {
+    return localStorage.getItem(WATCH_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const saveWatchName = (name: string): void => {
+  try {
+    localStorage.setItem(WATCH_KEY, name);
+  } catch (error) {
+    console.error('Failed to save watch name:', error);
+  }
+};
+
 export interface TournamentTemplate {
   id: string;
   name: string;

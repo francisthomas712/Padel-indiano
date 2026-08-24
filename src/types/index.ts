@@ -94,7 +94,7 @@ export interface TournamentState {
 }
 
 export interface HistoryEntry {
-  type: 'score_update' | 'match_complete' | 'match_delete' | 'player_add' | 'player_toggle' | 'round_generate';
+  type: 'score_update' | 'match_complete' | 'match_delete' | 'player_add' | 'player_edit' | 'player_delete' | 'player_toggle' | 'round_generate';
   timestamp: number;
   data: Record<string, unknown>;
   previousState?: Partial<TournamentState>;
