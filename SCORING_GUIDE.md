@@ -10,6 +10,10 @@ The Padel Indiano tournament uses a simple, point-based scoring system with serv
 - **Default**: First team to **7 points** wins
 - **Configurable**: Can be changed in Settings (range: 3-21 points)
 - **No advantage**: First to reach the target wins (e.g., 7-6 is a valid final score)
+- **Optional variants** (must be enabled before the tournament starts):
+  - **Win by 2**: at the target score a team must lead by 2 (e.g., 8-6 instead of 7-6)
+  - **Golden point**: with Win by 2 on, once *both* teams are at/above the target,
+    the next point wins — no marathon games
 
 ### How Matches Work
 
@@ -88,6 +92,17 @@ Players are ranked by:
    - **21 points**: Full-length games (~25-30 minutes)
 
 **Note**: Settings cannot be changed once the tournament starts.
+
+### Optional Win Conditions
+
+| Setting | Effect | Example (target 7) |
+|---------|--------|--------------------|
+| *(default)* | First to target wins | 7-6 wins |
+| **Win by 2** | Lead of 2 required at/above target | 8-6 wins, 7-6 keeps playing |
+| **Win by 2 + Golden point** | Once both teams reach the target, next point wins | 7-6 → 8-7 wins |
+
+These suit groups that dislike sudden-death finishes at 7-6 (enable Win by 2)
+or that want a hard stop instead of endless deuce-style play (add Golden point).
 
 ## Match Examples
 

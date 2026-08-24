@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { getPointDisplay, formatTime, getMatchDuration, checkMatchWinner, getNextServer } from '../scoring';
+import {
+  getPointDisplay,
+  formatTime,
+  getMatchDuration,
+  checkMatchWinner,
+  getNextServer,
+  getPreviousServer,
+  getServerInfo
+} from '../scoring';
 
 describe('scoring utils', () => {
   describe('getPointDisplay', () => {
@@ -76,6 +84,75 @@ describe('scoring utils', () => {
       const duration = getMatchDuration(start);
       // Should be approximately 1:00, allow some tolerance
       expect(duration).toMatch(/^[0-1]:[0-5][0-9]$/);
+    });
+  });
+
+  describe('getPreviousServer', () => {
+    it('should step back through the rotation', () => {
+      expect(getPreviousServer('pair2-p1')).toBe('pair1-p1');
+      expect(getPreviousServer('pair1-p2')).toBe('pair2-p1');
+      expect(getPreviousServer('pair2-p2')).toBe('pair1-p2');
+    });
+
+    it('should wrap around at the start of the rotation', () => {
+      expect(getPreviousServer('pair1-p1')).toBe('pair2-p2');
+    });
+
+    it('should default to pair1-p1 when undefined', () => {
+      expect(getPreviousServer(undefined)).toBe('pair1-p1');
+    });
+
+    it('should invert getNextServer', () => {
+      expect(getPreviousServer(getNextServer('pair2-p1'))).toBe('pair2-p1');
+      expect(getPreviousServer(getNextServer('pair1-p2'))).toBe('pair1-p2');
+    });
+  });
+
+  describe('getServerInfo', () => {
+    it('should resolve each rotation position to the correct pair and slot', () => {
+      expect(getServerInfo('pair1-p1')).toEqual({ pair: 1, slot: 0 });
+      expect(getServerInfo('pair2-p1')).toEqual({ pair: 2, slot: 0 });
+      expect(getServerInfo('pair1-p2')).toEqual({ pair: 1, slot: 1 });
+      expect(getServerInfo('pair2-p2')).toEqual({ pair: 2, slot: 1 });
+    });
+
+    it('should default to pair 1 slot 0 when undefined', () => {
+      expect(getServerInfo(undefined)).toEqual({ pair: 1, slot: 0 });
+    });
+  });
+
+  describe('checkMatchWinner with winByTwo', () => {
+    it('should not declare a winner on a one-point lead at the target', () => {
+      expect(checkMatchWinner(7, 6, 7, { winByTwo: true })).toBeNull();
+      expect(checkMatchWinner(8, 7, 7, { winByTwo: true })).toBeNull();
+    });
+
+    it('should declare a winner with a two-point lead at or above the target', () => {
+      expect(checkMatchWinner(8, 6, 7, { winByTwo: true })).toBe(1);
+      expect(checkMatchWinner(6, 8, 7, { winByTwo: true })).toBe(2);
+      expect(checkMatchWinner(10, 7, 7, { winByTwo: true })).toBe(1);
+    });
+
+    it('should not declare a winner below the target even with a big lead', () => {
+      expect(checkMatchWinner(6, 3, 7, { winByTwo: true })).toBeNull();
+    });
+
+    it('should handle ties', () => {
+      expect(checkMatchWinner(7, 7, 7, { winByTwo: true })).toBeNull();
+    });
+  });
+
+  describe('checkMatchWinner with winByTwo and golden point', () => {
+    it('should break a tied score at/above target by the next point', () => {
+      expect(checkMatchWinner(8, 7, 7, { winByTwo: true, goldenPoint: true })).toBe(1);
+      expect(checkMatchWinner(7, 8, 7, { winByTwo: true, goldenPoint: true })).toBe(2);
+    });
+
+    it('should still require two-point leads before both reach the target', () => {
+      // 8-6 is a clear two-point win
+      expect(checkMatchWinner(8, 6, 7, { winByTwo: true, goldenPoint: true })).toBe(1);
+      // 7-6 before both teams are at/above target stays live under strict rules
+      expect(checkMatchWinner(7, 6, 7, { winByTwo: true, goldenPoint: true })).toBeNull();
     });
   });
 });
