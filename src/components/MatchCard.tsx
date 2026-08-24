@@ -1,32 +1,51 @@
 import React from 'react';
+import { Maximize2 } from 'lucide-react';
 import { Match } from '../types';
-import { getMatchDuration } from '../utils/scoring';
+import { getMatchDuration, checkMatchWinner, getServerInfo, ServerPosition } from '../utils/scoring';
 import { calculatePairRating, calculatePointMultiplier } from '../utils/elo';
 
 interface MatchCardProps {
   match: Match;
   roundId: number;
+  pointsToWin: number;
+  winByTwo?: boolean;
+  goldenPoint?: boolean;
   onScoreUpdate: (roundId: number, matchId: string, team: 1 | 2, delta: number) => void;
   onComplete: (roundId: number, matchId: string) => void;
   onEdit: (roundId: number, matchId: string) => void;
   onDelete: (roundId: number, matchId: string) => void;
   onSaveEdit: (roundId: number, matchId: string) => void;
   onCancelEdit: (roundId: number, matchId: string) => void;
+  onExpand?: (roundId: number, matchId: string) => void;
   isEditing: boolean;
 }
 
 export const MatchCard: React.FC<MatchCardProps> = ({
   match,
   roundId,
+  pointsToWin,
+  winByTwo = false,
+  goldenPoint = false,
   onScoreUpdate,
   onComplete,
   onEdit,
   onDelete,
   onSaveEdit,
   onCancelEdit,
+  onExpand,
   isEditing
 }) => {
   const isDisabled = match.completed && !isEditing;
+
+  // Live win detection: highlight as soon as a team reaches the winning score
+  const pendingWinner = !match.completed && !isEditing
+    ? checkMatchWinner(match.score1, match.score2, pointsToWin, { winByTwo, goldenPoint })
+    : null;
+
+  // Resolve the current server to a player name
+  const serverInfo = getServerInfo(match.currentServer as ServerPosition | undefined);
+  const serverPair = serverInfo.pair === 1 ? match.pair1 : match.pair2;
+  const serverName = serverPair.players[serverInfo.slot]?.name;
 
   // Calculate ELO-based point multipliers
   const pair1Elo = calculatePairRating(
@@ -47,7 +66,32 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const pair2WeightedPoints = match.weightedPoints2 ?? Math.round(match.score2 * pair2Multiplier * 10) / 10;
 
   return (
-    <div className="border border-slate-600 rounded-lg p-4 bg-slate-800/50 backdrop-blur-sm hover:bg-slate-800 transition-all shadow-lg">
+    <div className={`border rounded-lg p-4 backdrop-blur-sm transition-all shadow-lg relative ${
+      pendingWinner
+        ? 'border-emerald-400 bg-emerald-500/10'
+        : 'border-slate-600 bg-slate-800/50 hover:bg-slate-800'
+    }`}>
+      {/* Card header: court chip + fullscreen expand */}
+      {(match.court !== undefined || (onExpand && !match.completed)) && (
+        <div className="absolute top-2 right-2 flex items-center gap-2">
+          {match.court !== undefined && (
+            <span className="px-2 py-0.5 bg-slate-700 text-slate-300 rounded-full text-xs font-semibold">
+              Court {match.court}
+            </span>
+          )}
+          {onExpand && !match.completed && (
+            <button
+              onClick={() => onExpand(roundId, match.id)}
+              className="p-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors touch-target"
+              aria-label="Open fullscreen scoreboard"
+              title="Fullscreen scoreboard"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-4 items-center">
         {/* Pair 1 */}
         <div className="space-y-1">
@@ -72,7 +116,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             >
               +
             </button>
-            <div className="text-3xl font-bold text-slate-100" aria-label={`Team 1 score: ${match.score1}`}>
+            <div
+              className={`text-3xl font-bold transition-all ${
+                pendingWinner === 1 ? 'text-emerald-400 animate-pulse scale-110' : 'text-slate-100'
+              }`}
+              aria-label={`Team 1 score: ${match.score1}`}
+            >
               {match.score1}
             </div>
             <button
@@ -96,7 +145,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             >
               +
             </button>
-            <div className="text-3xl font-bold text-slate-100" aria-label={`Team 2 score: ${match.score2}`}>
+            <div
+              className={`text-3xl font-bold transition-all ${
+                pendingWinner === 2 ? 'text-emerald-400 animate-pulse scale-110' : 'text-slate-100'
+              }`}
+              aria-label={`Team 2 score: ${match.score2}`}
+            >
               {match.score2}
             </div>
             <button
@@ -122,6 +176,15 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           ))}
         </div>
       </div>
+
+      {/* Serve indicator — the most-asked question on court */}
+      {!match.completed && serverName && (
+        <div className="mt-3 text-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 rounded-full text-sm font-semibold">
+            🎾 Serve: {serverName}
+          </span>
+        </div>
+      )}
 
       {/* ELO Info and Point Multipliers */}
       <div className="mt-3 pt-3 border-t border-slate-700">
@@ -176,9 +239,13 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       {!match.completed && (
         <button
           onClick={() => onComplete(roundId, match.id)}
-          className="w-full mt-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium transition-colors touch-target"
+          className={`w-full mt-3 py-2 text-white rounded-lg font-medium transition-colors touch-target ${
+            pendingWinner
+              ? 'bg-emerald-400 hover:bg-emerald-300 shadow-lg shadow-emerald-500/40 animate-pulse'
+              : 'bg-emerald-500 hover:bg-emerald-600'
+          }`}
         >
-          Complete Match
+          {pendingWinner ? '🏆 Confirm Win' : 'Complete Match'}
         </button>
       )}
 

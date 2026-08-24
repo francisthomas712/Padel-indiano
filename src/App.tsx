@@ -12,18 +12,23 @@ import {
   Upload,
   Undo,
   Redo,
-  PlusCircle
+  PlusCircle,
+  Maximize2,
+  Tv
 } from 'lucide-react';
 
 // Hooks
 import { useTournamentState } from './hooks/useTournamentState';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useWakeLock } from './hooks/useWakeLock';
 
 // Components
 import { PlayerList } from './components/PlayerList';
 import { Leaderboard } from './components/Leaderboard';
 import { MatchCard } from './components/MatchCard';
 import { Settings } from './components/Settings';
+import { CourtMode } from './components/CourtMode';
+import { SpectatorMode } from './components/SpectatorMode';
 
 // Types
 import {
@@ -39,7 +44,15 @@ import {
 
 // Utils
 import { generatePairs, matchPairs, findPlayersToSitOut } from './utils/pairingAlgorithm';
-import { getPointDisplay, checkMatchWinner, getNextServer } from './utils/scoring';
+import {
+  getPointDisplay,
+  checkMatchWinner,
+  getNextServer,
+  getPreviousServer,
+  getServerInfo,
+  ServerPosition
+} from './utils/scoring';
+import { hapticPoint, hapticCorrection, hapticWin } from './utils/haptics';
 import {
   calculatePairRating,
   calculateWeightedPoints,
@@ -64,6 +77,13 @@ interface EditingMatch {
   roundId: number;
   matchId: string;
 }
+
+/** Resolve a server position to the player name for the given pairs. */
+const resolveServerName = (server: ServerPosition | undefined, pair1: Pair, pair2: Pair): string | null => {
+  const info = getServerInfo(server);
+  const servingPair = info.pair === 1 ? pair1 : pair2;
+  return servingPair.players[info.slot]?.name ?? null;
+};
 
 const App: React.FC = () => {
   const {
@@ -90,6 +110,21 @@ const App: React.FC = () => {
   const [customPlayer2, setCustomPlayer2] = useState('');
   const [customPlayer3, setCustomPlayer3] = useState('');
   const [customPlayer4, setCustomPlayer4] = useState('');
+  const [courtModeTarget, setCourtModeTarget] = useState<EditingMatch | null>(null);
+  const [finalsCourtOpen, setFinalsCourtOpen] = useState(false);
+  const [spectatorOpen, setSpectatorOpen] = useState(false);
+
+  // Derived settings flags (optional fields for backward compatibility with saved data)
+  const winByTwo = state.settings.winByTwo ?? false;
+  const goldenPoint = state.settings.goldenPoint ?? false;
+
+  // Keep the screen awake while matches are in progress or court mode is open
+  const hasActivePlay =
+    state.rounds.some(r => r.matches.some(m => !m.completed)) ||
+    (state.finalsMode && state.finalsMatch !== null && !state.finalsMatch.completed) ||
+    courtModeTarget !== null ||
+    finalsCourtOpen;
+  useWakeLock(state.tournamentStarted && hasActivePlay);
 
   // Load templates on mount
   useEffect(() => {
@@ -232,8 +267,9 @@ const App: React.FC = () => {
       return;
     }
 
-    // Match pairs against each other
-    const matches = matchPairs(pairs, state.oppositionHistory, state.rounds.length);
+    // Match pairs against each other, assigning court numbers for parallel matches
+    const matches = matchPairs(pairs, state.oppositionHistory, state.rounds.length)
+      .map((match, index) => ({ ...match, court: index + 1 }));
 
     if (matches.length > 0) {
       const newRound: Round = {
@@ -296,7 +332,8 @@ const App: React.FC = () => {
       score1: 0,
       score2: 0,
       completed: false,
-      startTime: Date.now()
+      startTime: Date.now(),
+      court: 1
     };
 
     // Create the round
@@ -348,6 +385,9 @@ const App: React.FC = () => {
 
   // Update match score
   const updateScore = useCallback((roundId: number, matchId: string, team: 1 | 2, delta: number) => {
+    // Haptic feedback for on-court use
+    if (delta === 1) hapticPoint(); else hapticCorrection();
+
     const updatedRounds = state.rounds.map(round => {
       if (round.id === roundId) {
         return {
@@ -359,7 +399,10 @@ const App: React.FC = () => {
               return {
                 ...match,
                 score1: newScore1,
-                score2: newScore2
+                score2: newScore2,
+                // Keep service rotation in sync with score corrections:
+                // advance one step per point scored, step back per point removed.
+                currentServer: delta === 1 ? getNextServer(match.currentServer) : getPreviousServer(match.currentServer)
               };
             }
             return match;
@@ -510,7 +553,11 @@ const App: React.FC = () => {
       }
     );
 
-    toast.success('Match completed!');
+    const winnerName = match.score1 > match.score2
+      ? match.pair1.name
+      : match.score2 > match.score1 ? match.pair2.name : null;
+    hapticWin();
+    toast.success(winnerName ? `Match completed! ${winnerName} wins!` : 'Match completed!');
   }, [state, updateState]);
 
   // Start editing a match
@@ -894,11 +941,14 @@ const App: React.FC = () => {
     });
 
     toast.success('Finals initiated!');
-  }, [getLeaderboard, updateState]);
+  }, [state.players, updateState]);
 
   // Update finals score
   const updateFinalsScore = useCallback((team: 1 | 2, delta: number) => {
     if (!state.finalsMatch || state.finalsMatch.completed) return;
+
+    // Haptic feedback for on-court use
+    if (delta === 1) hapticPoint(); else hapticCorrection();
 
     const match = { ...state.finalsMatch };
 
@@ -908,19 +958,18 @@ const App: React.FC = () => {
       match.score2 = Math.max(0, match.score2 + delta);
     }
 
-    // Rotate server after point is scored (only on +1, not on -1)
-    if (delta === 1) {
-      match.currentServer = getNextServer(match.currentServer);
-    }
+    // Rotate server after point is scored; step back on corrections
+    match.currentServer = delta === 1 ? getNextServer(match.currentServer) : getPreviousServer(match.currentServer);
 
     // Check for winner using new scoring system
-    const winner = checkMatchWinner(match.score1, match.score2, state.settings.pointsToWin);
+    const winner = checkMatchWinner(match.score1, match.score2, state.settings.pointsToWin, { winByTwo, goldenPoint });
     if (winner) {
       match.winner = winner;
+      hapticWin();
     }
 
     updateState({ finalsMatch: match });
-  }, [state.finalsMatch, state.settings.pointsToWin, updateState]);
+  }, [state.finalsMatch, state.settings.pointsToWin, winByTwo, goldenPoint, updateState]);
 
   // Complete finals
   const completeFinalsMatch = useCallback(() => {
@@ -1190,6 +1239,14 @@ const App: React.FC = () => {
                       <RotateCcw className="w-5 h-5" />
                       Reset
                     </button>
+                    <button
+                      onClick={() => setSpectatorOpen(true)}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 font-semibold transition-all shadow-lg"
+                      title="Fullscreen leaderboard for players to check from the sideline"
+                    >
+                      <Tv className="w-5 h-5" />
+                      Spectator
+                    </button>
                   </div>
 
                   {/* Export buttons */}
@@ -1247,6 +1304,26 @@ const App: React.FC = () => {
                       </span>
                     )}
                   </div>
+
+                  {/* Serve indicator + Court Mode for the finals */}
+                  {!state.finalsMatch.completed && (
+                    <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+                      <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 rounded-full font-semibold">
+                        🎾 Serve: {resolveServerName(
+                          state.finalsMatch.currentServer as ServerPosition | undefined,
+                          state.finalsMatch.pair1,
+                          state.finalsMatch.pair2
+                        )}
+                      </span>
+                      <button
+                        onClick={() => setFinalsCourtOpen(true)}
+                        className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-700 text-slate-200 border border-slate-600 rounded-lg hover:bg-slate-600 font-semibold transition-colors"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                        Court Mode
+                      </button>
+                    </div>
+                  )}
 
                   {!state.finalsMatch.completed && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1411,7 +1488,16 @@ const App: React.FC = () => {
                             <h3 className="text-2xl font-bold text-slate-100">Round {idx + 1}</h3>
                             {round.sittingOut && (
                               <p className="text-sm text-orange-400 mt-1">
-                                Sitting out: {round.sittingOut.name}
+                                🪑 Sitting out: {round.sittingOut.name}
+                                {'players' in round.sittingOut && (
+                                  <span className="text-slate-500">
+                                    {' '}({round.sittingOut.players.map(p => `${p.sitOutCount}×`).join(', ')})
+                                  </span>
+                                )}
+                                {!('players' in round.sittingOut) && (() => {
+                                  const sitter = state.players.find(p => p.id === round.sittingOut!.id);
+                                  return sitter ? <span className="text-slate-500"> ({sitter.sitOutCount}× total)</span> : null;
+                                })()}
                               </p>
                             )}
                           </div>
@@ -1437,12 +1523,16 @@ const App: React.FC = () => {
                               key={match.id}
                               match={match}
                               roundId={round.id}
+                              pointsToWin={state.settings.pointsToWin}
+                              winByTwo={winByTwo}
+                              goldenPoint={goldenPoint}
                               onScoreUpdate={updateScore}
                               onComplete={completeMatch}
                               onEdit={startEditingMatch}
                               onDelete={deleteMatch}
                               onSaveEdit={saveEditedMatch}
                               onCancelEdit={cancelEditingMatch}
+                              onExpand={(rId, mId) => setCourtModeTarget({ roundId: rId, matchId: mId })}
                               isEditing={editingMatch?.roundId === round.id && editingMatch?.matchId === match.id}
                             />
                           ))}
@@ -1750,6 +1840,75 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Fullscreen Court Mode for a regular match */}
+      {(() => {
+        if (!courtModeTarget) return null;
+        const round = state.rounds.find(r => r.id === courtModeTarget.roundId);
+        const match = round?.matches.find(m => m.id === courtModeTarget.matchId);
+        if (!match || match.completed) return null;
+        const pair1Name = match.pair1.name ?? match.pair1.players.map(p => p.name).join(' & ');
+        const pair2Name = match.pair2.name ?? match.pair2.players.map(p => p.name).join(' & ');
+        return (
+          <CourtMode
+            isOpen
+            title={`Court ${match.court ?? 1}`}
+            team1Name={pair1Name}
+            team2Name={pair2Name}
+            score1={match.score1}
+            score2={match.score2}
+            pointsToWin={state.settings.pointsToWin}
+            winByTwo={winByTwo}
+            goldenPoint={goldenPoint}
+            serverName={resolveServerName(match.currentServer as ServerPosition | undefined, match.pair1, match.pair2)}
+            completed={false}
+            startTime={match.startTime}
+            onPoint={(team, delta) => updateScore(courtModeTarget.roundId, courtModeTarget.matchId, team, delta)}
+            onConfirmWin={() => completeMatch(courtModeTarget.roundId, courtModeTarget.matchId)}
+            onClose={() => setCourtModeTarget(null)}
+          />
+        );
+      })()}
+
+      {/* Fullscreen Court Mode for the finals */}
+      {state.finalsMode && state.finalsMatch && !state.finalsMatch.completed && (
+        <CourtMode
+          isOpen={finalsCourtOpen}
+          title="🏆 Finals"
+          team1Name={state.finalsMatch.pair1.name ?? state.finalsMatch.pair1.players.map(p => p.name).join(' & ')}
+          team2Name={state.finalsMatch.pair2.name ?? state.finalsMatch.pair2.players.map(p => p.name).join(' & ')}
+          score1={state.finalsMatch.score1}
+          score2={state.finalsMatch.score2}
+          pointsToWin={state.settings.pointsToWin}
+          winByTwo={winByTwo}
+          goldenPoint={goldenPoint}
+          serverName={resolveServerName(
+            state.finalsMatch.currentServer as ServerPosition | undefined,
+            state.finalsMatch.pair1,
+            state.finalsMatch.pair2
+          )}
+          completed={state.finalsMatch.completed}
+          onPoint={(team, delta) => updateFinalsScore(team, delta)}
+          onConfirmWin={() => completeFinalsMatch()}
+          onClose={() => setFinalsCourtOpen(false)}
+        />
+      )}
+
+      {/* Fullscreen spectator leaderboard */}
+      <SpectatorMode
+        isOpen={spectatorOpen}
+        leaderboard={getLeaderboard()}
+        mode={leaderboardMode}
+        onModeChange={setLeaderboardMode}
+        restingLabel={
+          (() => {
+            const lastRound = state.rounds[state.rounds.length - 1];
+            if (!state.tournamentStarted || !lastRound) return null;
+            return lastRound.sittingOut ? `🪑 ${lastRound.sittingOut.name}` : null;
+          })()
+        }
+        onClose={() => setSpectatorOpen(false)}
+      />
     </div>
   );
 };

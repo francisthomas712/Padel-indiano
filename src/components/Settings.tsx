@@ -54,6 +54,42 @@ export const Settings: React.FC<SettingsProps> = ({
             How the finals should be structured
           </p>
         </div>
+        <div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.winByTwo ?? false}
+              onChange={(e) => onSettingsChange({ ...settings, winByTwo: e.target.checked })}
+              disabled={disabled}
+              className="mt-1 w-5 h-5 accent-green-600 disabled:cursor-not-allowed"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-700">Win by 2 points</span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                At the target score a team must lead by 2 to win (e.g., 8-6 instead of 7-6).
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div>
+          <label className={`flex items-start gap-3 ${settings.winByTwo ? 'cursor-pointer' : 'opacity-50'}`}>
+            <input
+              type="checkbox"
+              checked={settings.goldenPoint ?? false}
+              onChange={(e) => onSettingsChange({ ...settings, goldenPoint: e.target.checked })}
+              disabled={disabled || !settings.winByTwo}
+              className="mt-1 w-5 h-5 accent-green-600 disabled:cursor-not-allowed"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-700">Golden point</span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                With win-by-2 enabled: once both teams reach the target score, the next point wins
+                (no marathon games).
+              </span>
+            </span>
+          </label>
+        </div>
 
         {disabled && (
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
