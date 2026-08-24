@@ -14,7 +14,8 @@ import {
   Redo,
   PlusCircle,
   Maximize2,
-  Tv
+  Tv,
+  LogOut
 } from 'lucide-react';
 
 // Hooks
@@ -72,6 +73,8 @@ import {
   shareResults
 } from './utils/export';
 import {
+  clearSavedRole,
+  clearSavedWatchName,
   loadSavedRole,
   loadSavedWatchName,
   saveRole,
@@ -220,6 +223,8 @@ const App: React.FC = () => {
   const [finalsCourtOpen, setFinalsCourtOpen] = useState(false);
   const [spectatorOpen, setSpectatorOpen] = useState(false);
   const [watchKey, setWatchKey] = useState<string | null>(null);
+  // Courts picker shown alongside Start Tournament (defaults to 2)
+  const [pendingCourts, setPendingCourts] = useState(2);
 
   // Deep-link spectator space: …/#/watch/<groupName>
   useEffect(() => {
@@ -612,14 +617,30 @@ const App: React.FC = () => {
     // Initialize history for all players
     state.players.forEach(p => initializePlayerHistory(p.id));
 
-    updateState({ tournamentStarted: true });
-    toast.success('Tournament started!');
+    updateState({ tournamentStarted: true, settings: { ...state.settings, courts: pendingCourts } });
+    toast.success(`Tournament started on ${pendingCourts} court${pendingCourts > 1 ? 's' : ''}!`);
 
     // Auto-generate first round
     setTimeout(() => {
       generateNextRound();
     }, 100);
-  }, [state.players, updateState, initializePlayerHistory, generateNextRound]);
+  }, [state.players, state.settings, pendingCourts, updateState, initializePlayerHistory, generateNextRound]);
+
+  // Sign out of the current group: clears the saved role and returns to the join gate.
+  // Tournament data is kept — signing back in as admin resumes where you left off.
+  const signOutGroup = useCallback(() => {
+    if (state.tournamentStarted && !window.confirm('Sign out? Your tournament is saved on this device and will be here when you sign back in.')) {
+      return;
+    }
+    clearSavedRole();
+    clearSavedWatchName();
+    setOnboarded(false);
+    setSpectatorOpen(false);
+    setWatchKey(null);
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [state.tournamentStarted]);
 
   // Update match score
   const updateScore = useCallback((roundId: number, matchId: string, team: 1 | 2, delta: number) => {
@@ -1349,6 +1370,14 @@ const App: React.FC = () => {
               >
                 <Redo className="w-5 h-5" />
               </button>
+              <button
+                onClick={signOutGroup}
+                className="p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-red-500/80 hover:text-white transition-all hover:shadow-lg"
+                title={`Sign out of ${state.groupName ?? 'group'}`}
+                aria-label="Sign out of current group"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
@@ -1374,14 +1403,46 @@ const App: React.FC = () => {
             <div>
               {/* Tournament Controls */}
               {!state.tournamentStarted && state.players.filter(p => p.active).length >= 4 && (
-                <div className="flex gap-3 mb-6">
-                  <button
-                    onClick={startTournament}
-                    className="flex-1 py-3 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 font-semibold transition-colors"
-                  >
-                    <Play className="w-5 h-5" />
-                    Start Tournament
-                  </button>
+                <div className="space-y-3 mb-6">
+                  {/* Court count picker — locks in when the tournament starts */}
+                  <div className="flex items-center justify-between gap-4 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-200">Courts available</div>
+                      <div className="text-xs text-slate-400">How many matches run in parallel each round</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPendingCourts(c => Math.max(1, c - 1))}
+                        className="w-10 h-10 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 text-xl font-bold flex items-center justify-center touch-target"
+                        aria-label="Fewer courts"
+                      >
+                        −
+                      </button>
+                      <span
+                        className="text-2xl font-bold text-emerald-400 w-10 text-center tabular-nums"
+                        aria-live="polite"
+                      >
+                        {pendingCourts}
+                      </span>
+                      <button
+                        onClick={() => setPendingCourts(c => Math.min(16, c + 1))}
+                        className="w-10 h-10 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 text-xl font-bold flex items-center justify-center touch-target"
+                        aria-label="More courts"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={startTournament}
+                      className="flex-1 py-3 bg-blue-500/100 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 font-semibold transition-colors"
+                    >
+                      <Play className="w-5 h-5" />
+                      Start Tournament
+                    </button>
+                  </div>
                 </div>
               )}
 

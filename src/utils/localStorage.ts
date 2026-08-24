@@ -120,6 +120,22 @@ export const saveWatchName = (name: string): void => {
   }
 };
 
+export const clearSavedRole = (): void => {
+  try {
+    localStorage.removeItem(ROLE_KEY);
+  } catch (error) {
+    console.error('Failed to clear role:', error);
+  }
+};
+
+export const clearSavedWatchName = (): void => {
+  try {
+    localStorage.removeItem(WATCH_KEY);
+  } catch (error) {
+    console.error('Failed to clear watch name:', error);
+  }
+};
+
 export interface TournamentTemplate {
   id: string;
   name: string;
