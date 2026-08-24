@@ -102,4 +102,4 @@ export interface HistoryEntry {
 
 export type LeaderboardMode = 'ppg' | 'total' | 'elo';
 
-export type ActiveTab = 'tournament' | 'rules' | 'history' | 'settings';
+export type ActiveTab = 'tournament' | 'players' | 'rules' | 'history' | 'settings';

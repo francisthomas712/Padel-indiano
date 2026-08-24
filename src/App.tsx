@@ -30,6 +30,7 @@ import { Settings } from './components/Settings';
 import { CourtMode } from './components/CourtMode';
 import { SpectatorMode, LiveScoreboard } from './components/SpectatorMode';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import { PlayerStats } from './components/PlayerStats';
 
 // Types
 import {
@@ -38,6 +39,7 @@ import {
   Match,
   Round,
   FinalsMatch,
+  HistoryEntry,
   LeaderboardMode,
   ActiveTab,
   PlayerWithStats
@@ -1223,6 +1225,42 @@ const App: React.FC = () => {
     toast.success('Group deleted');
   }, []);
 
+  // Human-readable one-liner for a history entry
+  const describeHistoryEntry = useCallback((entry: HistoryEntry): string => {
+    const data = entry.data as Record<string, unknown>;
+    const nameOf = (p: unknown): string =>
+      typeof p === 'object' && p !== null && 'name' in p ? String((p as Player).name) : 'player';
+    switch (entry.type) {
+      case 'score_update': {
+        const team = data.team === 1 ? 1 : 2;
+        return `${(data.delta as number) > 0 ? '+' : ''}${data.delta} point for team ${team}`;
+      }
+      case 'match_complete': {
+        const round = state.rounds.find(r => r.id === data.roundId);
+        const match = round?.matches.find(m => m.id === data.matchId);
+        if (match) {
+          const w = match.score1 > match.score2 ? match.pair1 : match.pair2;
+          return `${w.name ?? w.players.map(p => p.name).join(' & ')} won ${Math.max(match.score1, match.score2)}–${Math.min(match.score1, match.score2)}`;
+        }
+        return 'Match completed';
+      }
+      case 'match_delete':
+        return 'Match deleted';
+      case 'player_add':
+        return data.player ? `Added ${nameOf(data.player)}` : 'Player added';
+      case 'player_edit':
+        return `Edited player (${String(data.name ?? '')})`;
+      case 'player_delete':
+        return 'Player removed';
+      case 'player_toggle':
+        return 'Player active/away toggled';
+      case 'round_generate':
+        return `Round generated${state.rounds.length ? ` (#${state.rounds.length})` : ''}`;
+      default:
+        return 'Tournament action';
+    }
+  }, [state.rounds]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onUndo: canUndo ? undo : undefined,
@@ -1329,7 +1367,7 @@ const App: React.FC = () => {
 
           {/* Tab Navigation */}
           <div className="flex gap-2 mb-8 border-b border-slate-700 flex-wrap">
-            {(['tournament', 'rules', 'history', 'settings'] as ActiveTab[]).map(tab => (
+            {(['tournament', 'players', 'rules', 'history', 'settings'] as ActiveTab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1347,20 +1385,6 @@ const App: React.FC = () => {
           {/* Tournament Tab */}
           {activeTab === 'tournament' && (
             <div>
-              {/* Player Management */}
-              <PlayerList
-                players={state.players}
-                newPlayerName={newPlayerName}
-                newPlayerElo={newPlayerElo}
-                onNewPlayerNameChange={setNewPlayerName}
-                onNewPlayerEloChange={setNewPlayerElo}
-                onAddPlayer={addPlayer}
-                onRemovePlayer={removePlayer}
-                onEditPlayer={editPlayer}
-                onToggleActive={togglePlayerActive}
-                tournamentStarted={state.tournamentStarted}
-              />
-
               {/* Tournament Controls */}
               {!state.tournamentStarted && state.players.filter(p => p.active).length >= 4 && (
                 <div className="flex gap-3 mb-6">
@@ -1867,6 +1891,29 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {/* Players Tab — management + career stats */}
+          {activeTab === 'players' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-100 mb-4">Manage Players</h2>
+                <PlayerList
+                  players={state.players}
+                  newPlayerName={newPlayerName}
+                  newPlayerElo={newPlayerElo}
+                  onNewPlayerNameChange={setNewPlayerName}
+                  onNewPlayerEloChange={setNewPlayerElo}
+                  onAddPlayer={addPlayer}
+                  onRemovePlayer={removePlayer}
+                  onEditPlayer={editPlayer}
+                  onToggleActive={togglePlayerActive}
+                  tournamentStarted={state.tournamentStarted}
+                />
+              </div>
+
+              <PlayerStats players={state.players} rounds={state.rounds} />
+            </div>
+          )}
+
           {/* Rules Tab */}
           {activeTab === 'rules' && (
             <div className="prose max-w-none">
@@ -1942,14 +1989,14 @@ const App: React.FC = () => {
               ) : (
                 <div className="space-y-2">
                   {[...history].reverse().map((entry, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div key={idx} className="bg-slate-800/60 border border-slate-700 rounded-lg p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="font-semibold text-slate-200 capitalize">
-                            {entry.type.replace('_', ' ')}
+                          <span className="font-semibold text-slate-200">
+                            {describeHistoryEntry(entry)}
                           </span>
                           <span className="text-sm text-slate-400 ml-2">
-                            {new Date(entry.timestamp).toLocaleString()}
+                            {new Date(entry.timestamp).toLocaleTimeString()}
                           </span>
                         </div>
                       </div>

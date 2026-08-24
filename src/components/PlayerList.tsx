@@ -170,7 +170,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {tournamentStarted ? (
+                  {tournamentStarted && (
                     <button
                       onClick={() => onToggleActive(player.id)}
                       className={`transition-all touch-target ${
@@ -183,26 +183,23 @@ export const PlayerList: React.FC<PlayerListProps> = ({
                     >
                       {player.active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
                     </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => startEditing(player)}
-                        className="text-slate-400 hover:text-emerald-400 transition-all touch-target"
-                        title="Edit name / ELO"
-                        aria-label={`Edit ${player.name}`}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onRemovePlayer(player.id)}
-                        className="text-red-400 hover:text-red-300 transition-all touch-target"
-                        title="Remove player"
-                        aria-label={`Remove ${player.name}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
                   )}
+                  <button
+                    onClick={() => startEditing(player)}
+                    className="text-slate-400 hover:text-emerald-400 transition-all touch-target"
+                    title="Edit name / ELO"
+                    aria-label={`Edit ${player.name}`}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onRemovePlayer(player.id)}
+                    className="text-red-400 hover:text-red-300 transition-all touch-target"
+                    title="Remove player"
+                    aria-label={`Remove ${player.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </>
             )}
