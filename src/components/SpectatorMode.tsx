@@ -3,6 +3,7 @@ import { X, Radio } from 'lucide-react';
 import { Leaderboard } from './Leaderboard';
 import { PlayerWithStats, LeaderboardMode } from '../types';
 import { Group } from '../utils/groups';
+import { LiveSnapshot } from '../utils/liveSync';
 
 /** One live match rendered as a big courtside scoreboard card. */
 export interface LiveScoreboard {
@@ -32,6 +33,8 @@ interface SpectatorModeProps {
   onModeChange: (mode: LeaderboardMode) => void;
   restingLabel: string | null;
   onShareWatch: (groupName: string) => void;
+  /** Snapshot synced from the organizer's device (when this device has no live session) */
+  remote: LiveSnapshot | null;
 }
 
 /**
@@ -54,7 +57,8 @@ export const SpectatorMode: React.FC<SpectatorModeProps> = ({
   mode,
   onModeChange,
   restingLabel,
-  onShareWatch
+  onShareWatch,
+  remote
 }) => {
   useEffect(() => {
     if (!isOpen) return;
@@ -68,10 +72,17 @@ export const SpectatorMode: React.FC<SpectatorModeProps> = ({
   if (!isOpen) return null;
 
   const watchGroup = watchKey ? groups[watchKey] : null;
-  const headlineGroup = watchGroup?.name ?? sessionGroupName;
-  const hasLiveSession = leaderboard.length > 0 || liveBoards.length > 0;
+  const headlineGroup = watchGroup?.name ?? sessionGroupName ?? remote?.groupName ?? null;
 
-  // Roster fallback: group saved but no live session on this device
+  // Local live session wins; otherwise show the organizer's synced snapshot
+  const boards = liveBoards.length > 0 ? liveBoards : remote?.boards ?? [];
+  const standings = leaderboard.length > 0 ? leaderboard : remote?.leaderboard ?? [];
+  const resting = restingLabel ?? remote?.restingLabel ?? null;
+  const hasLiveSession = boards.length > 0 || standings.length > 0;
+  const syncedFromRemote = liveBoards.length === 0 && leaderboard.length === 0 && remote !== null;
+  const syncedSecondsAgo = remote ? Math.max(0, Math.round((Date.now() - remote.updatedAt) / 1000)) : null;
+
+  // Roster fallback: group saved but no live session anywhere
   const roster = watchGroup
     ? [...watchGroup.players].sort((a, b) => b.eloRating - a.eloRating)
     : [];
@@ -95,6 +106,11 @@ export const SpectatorMode: React.FC<SpectatorModeProps> = ({
                 <>
                   <Radio className="w-4 h-4 text-red-400 animate-pulse" />
                   Live now — {liveBoards.length} match{liveBoards.length > 1 ? 'es' : ''} in progress
+                </>
+              ) : syncedFromRemote ? (
+                <>
+                  <Radio className="w-4 h-4 text-red-400 animate-pulse" />
+                  Live from the organizer's device · updated {syncedSecondsAgo}s ago
                 </>
               ) : hasLiveSession ? (
                 'Tournament in progress'
@@ -153,18 +169,18 @@ export const SpectatorMode: React.FC<SpectatorModeProps> = ({
         )}
 
         {/* Resting banner */}
-        {restingLabel && hasLiveSession && (
+        {resting && hasLiveSession && (
           <div className="mb-4 flex justify-center">
             <span className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-600 rounded-full text-slate-300 font-semibold">
-              🪑 Resting this round: {restingLabel}
+              🪑 Resting this round: {resting}
             </span>
           </div>
         )}
 
         {/* LIVE scoreboards */}
-        {liveBoards.length > 0 && (
+        {boards.length > 0 && (
           <div className="space-y-4 mb-8">
-            {liveBoards.map(board => {
+            {boards.map(board => {
               const servingTeam =
                 board.serverName === board.team1Name ? 'left' :
                 board.serverName === board.team2Name ? 'right' : null;
@@ -196,9 +212,9 @@ export const SpectatorMode: React.FC<SpectatorModeProps> = ({
         )}
 
         {/* Standings or saved roster */}
-        {leaderboard.length > 0 ? (
+        {standings.length > 0 ? (
           <div style={{ zoom: 1.25 }}>
-            <Leaderboard leaderboard={leaderboard} mode={mode} onModeChange={onModeChange} />
+            <Leaderboard leaderboard={standings} mode={mode} onModeChange={onModeChange} />
           </div>
         ) : roster.length > 0 ? (
           <div className="space-y-2">

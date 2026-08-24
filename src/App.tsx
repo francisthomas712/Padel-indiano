@@ -33,6 +33,7 @@ import { SpectatorMode, LiveScoreboard } from './components/SpectatorMode';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { PlayerStats } from './components/PlayerStats';
 import { ParticipantPicker } from './components/ParticipantPicker';
+import { LiveSnapshot, pollLiveState, publishLiveState } from './utils/liveSync';
 
 // Types
 import {
@@ -227,6 +228,8 @@ const App: React.FC = () => {
   const [finalsCourtOpen, setFinalsCourtOpen] = useState(false);
   const [spectatorOpen, setSpectatorOpen] = useState(false);
   const [watchKey, setWatchKey] = useState<string | null>(null);
+  // Snapshot synced from the organizer's device (spectator side)
+  const [remoteSnapshot, setRemoteSnapshot] = useState<LiveSnapshot | null>(null);
   // Courts picker shown alongside Start Tournament (defaults to 2)
   const [pendingCourts, setPendingCourts] = useState(2);
 
@@ -1349,6 +1352,31 @@ const App: React.FC = () => {
     return boards;
   }, [state.rounds, state.finalsMode, state.finalsMatch, state.settings.pointsToWin]);
 
+  // Publish this device's live snapshot so other devices can watch the group
+  // (admin side; debounced inside liveSync, silent when offline)
+  useEffect(() => {
+    if (role !== 'admin' || !state.groupName) return;
+    const lastRound = state.rounds[state.rounds.length - 1];
+    publishLiveState({
+      groupName: normalizeGroupName(state.groupName),
+      updatedAt: Date.now(),
+      boards: liveBoards,
+      leaderboard: getLeaderboard(),
+      mode: leaderboardMode,
+      restingLabel:
+        state.tournamentStarted && lastRound?.sittingOut ? lastRound.sittingOut.name : null
+    });
+  }, [role, state.groupName, state.rounds, state.tournamentStarted, liveBoards, getLeaderboard, leaderboardMode]);
+
+  // Poll the organizer's snapshot while spectating another device's session
+  useEffect(() => {
+    if (role === 'admin' || !spectatorOpen || !watchKey) {
+      setRemoteSnapshot(null);
+      return;
+    }
+    return pollLiveState(watchKey, setRemoteSnapshot);
+  }, [role, spectatorOpen, watchKey]);
+
   // First-run gate: everyone picks a group name and role before seeing the app
   // (placed after all hooks so hook order stays stable across renders)
   if (!onboarded) {
@@ -2303,6 +2331,7 @@ const App: React.FC = () => {
           })()
         }
         onShareWatch={handleShareWatch}
+        remote={remoteSnapshot}
         onClose={() => {
           setSpectatorOpen(false);
           setWatchKey(null);

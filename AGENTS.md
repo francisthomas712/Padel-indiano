@@ -25,6 +25,7 @@ A client-only React SPA that manages "Padel Indiano" tournaments (Mexican-style 
 - `src/utils/tieBreaking.ts` — 7-level leaderboard tie-breaking.
 - `src/utils/localStorage.ts` — persistence; keys: `padel-indiano-tournament`, `-templates`, `-history`, `-version`.
 - `src/utils/groups.ts` — named Groups (unique one-word player sets + historical ELOs); key: `padel-indiano-groups`. Independent of state versioning.
+- `netlify/functions/live-state.mts` + `src/utils/liveSync.ts` — cross-device spectator sync: the admin device publishes a live snapshot (scores/standings) to Netlify Blobs, spectator devices poll `GET /api/live-state?group=<name>`. All sync failures are silent; the app must stay fully usable offline.
 - `src/components/` — `PlayerList`, `Leaderboard`, `MatchCard`, `Settings`, `Toast`, `PlayerAvatar`, `CourtMode` (fullscreen scoring), `SpectatorMode` (live boards + watch deep links).
 - `padel-indiano.js` (repo root) — the legacy pre-refactor single-file app. Reference only; **do not edit or import it**.
 - Docs: `README.md`, `SCORING_GUIDE.md` (domain rules), `DEPLOYMENT.md`, `IMPROVEMENTS.md` (refactor history).
