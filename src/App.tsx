@@ -32,6 +32,7 @@ import { CourtMode } from './components/CourtMode';
 import { SpectatorMode, LiveScoreboard } from './components/SpectatorMode';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { PlayerStats } from './components/PlayerStats';
+import { ParticipantPicker } from './components/ParticipantPicker';
 
 // Types
 import {
@@ -442,8 +443,13 @@ const App: React.FC = () => {
       }
     );
 
-    toast.success(`${player.name} is now ${player.active ? 'away' : 'active'}`);
-  }, [state.players, updateState]);
+    // Context-aware wording: pre-start this is participation, mid-tournament it's away/back
+    toast.success(
+      state.tournamentStarted
+        ? `${player.name} is now ${player.active ? 'away' : 'active'}`
+        : `${player.name} ${player.active ? 'is playing' : 'is out'}`
+    );
+  }, [state.players, state.tournamentStarted, updateState]);
 
   // Generate next round
   const generateNextRound = useCallback(() => {
@@ -1401,6 +1407,15 @@ const App: React.FC = () => {
           {/* Tournament Tab */}
           {activeTab === 'tournament' && (
             <div>
+              {/* Participant selection — pick who's playing before starting */}
+              {!state.tournamentStarted && state.players.length > 0 && (
+                <ParticipantPicker
+                  players={state.players}
+                  tournamentStarted={false}
+                  onToggleActive={togglePlayerActive}
+                />
+              )}
+
               {/* Tournament Controls */}
               {!state.tournamentStarted && state.players.filter(p => p.active).length >= 4 && (
                 <div className="space-y-3 mb-6">
@@ -1499,6 +1514,13 @@ const App: React.FC = () => {
 
               {state.tournamentStarted && !state.finalsMode && (
                 <div className="space-y-3 mb-6">
+                  {/* Who's here today — toggles away/back for new rounds */}
+                  <ParticipantPicker
+                    players={state.players}
+                    tournamentStarted
+                    onToggleActive={togglePlayerActive}
+                  />
+
                   <div className="flex gap-3 flex-wrap">
                     <button
                       onClick={generateNextRound}
