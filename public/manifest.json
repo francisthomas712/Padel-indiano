@@ -4,9 +4,9 @@
   "description": "Dynamic skill-based tournament management system for padel players",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#22c55e",
-  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any",
   "icons": [
     {
       "src": "/trophy-192.png",
