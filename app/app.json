@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Padel Indiano",
+    "slug": "padel-indiano",
+    "version": "1.0.0",
+    "orientation": "default",
+    "platforms": ["ios"],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "bundleIdentifier": "sg.lothaltech.padelindiano",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-keep-awake"
+    ],
+    "extra": {
+      "entitlementServer": "https://padel-entitlement.ottercycle.com",
+      "liveSyncBase": "https://padel-indiano.netlify.app",
+      "eas": {
+        "projectId": "SET-AT-FIRST-EAS-BUILD"
+      }
+    }
+  }
+}

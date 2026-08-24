@@ -2,6 +2,8 @@
 
 A modern, feature-rich tournament management system for Padel Indiano with dynamic skill-based pairing.
 
+> **iOS app**: a native Expo app (organizer console with day-pass payments) lives in `app/`, with its entitlement server in `server/`. See `docs/PADEL-APP.md`. This repo's web app remains the free spectator surface.
+
 ## Features
 
 ### 🎯 Core Functionality
