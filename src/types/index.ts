@@ -31,6 +31,7 @@ export interface Match {
   startTime?: number;
   endTime?: number;
   currentServer?: 'pair1-p1' | 'pair1-p2' | 'pair2-p1' | 'pair2-p2';
+  court?: number;  // Optional court assignment for parallel matches
 }
 
 export interface Round {
@@ -71,6 +72,10 @@ export interface OppositionHistory {
 export interface TournamentSettings {
   pointsToWin: number;
   finalsFormat: 'traditional' | 'semifinal';
+  /** Winner must lead by 2 once pointsToWin is reached (default: off) */
+  winByTwo?: boolean;
+  /** With winByTwo, tied score at/above target is broken by next point (default: off) */
+  goldenPoint?: boolean;
 }
 
 export interface TournamentState {
@@ -87,7 +92,7 @@ export interface TournamentState {
 export interface HistoryEntry {
   type: 'score_update' | 'match_complete' | 'match_delete' | 'player_add' | 'player_toggle' | 'round_generate';
   timestamp: number;
-  data: any;
+  data: Record<string, unknown>;
   previousState?: Partial<TournamentState>;
 }
 

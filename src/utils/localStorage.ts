@@ -1,10 +1,30 @@
-import { TournamentState } from '../types';
+import { HistoryEntry, TournamentState } from '../types';
 
 const STORAGE_KEY = 'padel-indiano-tournament';
 const TEMPLATES_KEY = 'padel-indiano-templates';
 const HISTORY_KEY = 'padel-indiano-history';
 const VERSION_KEY = 'padel-indiano-version';
-const CURRENT_VERSION = '3.0.0'; // v3.0.0: Added ELO rating system with weighted points
+const CURRENT_VERSION = '3.1.0'; // v3.1.0: court labels, win-by-two & golden-point settings (merge migration — no data loss)
+
+// Fill in fields added after v3.0.0 so old saved states keep working.
+// New fields are optional with safe defaults, so this never drops user data.
+const normalizeSettings = (settings: unknown): TournamentState['settings'] => {
+  const raw = (typeof settings === 'object' && settings !== null ? settings : {}) as Record<string, unknown>;
+  return {
+    pointsToWin: typeof raw.pointsToWin === 'number' && raw.pointsToWin >= 3 ? raw.pointsToWin : 7,
+    finalsFormat: raw.finalsFormat === 'semifinal' ? 'semifinal' : 'traditional',
+    winByTwo: raw.winByTwo === true,
+    goldenPoint: raw.goldenPoint === true
+  };
+};
+
+const normalizeTournamentState = (state: unknown): TournamentState | null => {
+  if (typeof state !== 'object' || state === null || !Array.isArray((state as Record<string, unknown>).players)) {
+    return null;
+  }
+  const raw = state as Record<string, unknown>;
+  return { ...(raw as unknown as TournamentState), settings: normalizeSettings(raw.settings) };
+};
 
 export const saveTournamentState = (state: TournamentState): void => {
   try {
@@ -25,10 +45,9 @@ export const loadTournamentState = (): TournamentState | null => {
     // Check version compatibility
     const storedVersion = localStorage.getItem(VERSION_KEY);
     if (storedVersion !== CURRENT_VERSION) {
-      console.log(`Version mismatch (stored: ${storedVersion}, current: ${CURRENT_VERSION}). Clearing old data.`);
-      clearTournamentState();
-      localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
-      return null;
+      // Migrate instead of clearing: newer/older versions are merged field-by-field
+      // via normalizeTournamentState. Only unparseable/corrupt data is discarded.
+      console.log(`Version mismatch (stored: ${storedVersion}, current: ${CURRENT_VERSION}). Migrating.`);
     }
 
     const serialized = localStorage.getItem(STORAGE_KEY);
@@ -39,7 +58,14 @@ export const loadTournamentState = (): TournamentState | null => {
     const parsed = JSON.parse(serialized);
     // Handle both old format (direct state) and new format (with version wrapper)
     const state = parsed.version ? parsed.state : parsed;
-    return state;
+    const normalized = normalizeTournamentState(state);
+    if (normalized === null) {
+      clearTournamentState();
+      localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+      return null;
+    }
+    localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+    return normalized;
   } catch (error) {
     console.error('Failed to load tournament state:', error);
     return null;
@@ -102,7 +128,7 @@ export const deleteTemplate = (templateId: string): void => {
   }
 };
 
-export const saveHistory = (history: any[]): void => {
+export const saveHistory = (history: HistoryEntry[]): void => {
   try {
     // Keep only last 100 entries
     const trimmed = history.slice(-100);
@@ -112,7 +138,7 @@ export const saveHistory = (history: any[]): void => {
   }
 };
 
-export const loadHistory = (): any[] => {
+export const loadHistory = (): HistoryEntry[] => {
   try {
     const serialized = localStorage.getItem(HISTORY_KEY);
     if (serialized === null) {
