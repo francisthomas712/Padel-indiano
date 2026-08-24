@@ -9,8 +9,8 @@ import { PlayerWithStats, LeaderboardMode } from '../types';
  * enhancement.
  */
 
-const POLL_INTERVAL_MS = 4000;
-const PUBLISH_DEBOUNCE_MS = 1500;
+const POLL_INTERVAL_MS = 1500;
+const PUBLISH_DEBOUNCE_MS = 300;
 
 export interface LiveSnapshot {
   groupName: string;
@@ -28,21 +28,16 @@ const endpoint = (group: string): string =>
   `/api/live-state?group=${encodeURIComponent(group)}`;
 
 /**
- * Publish a snapshot for a group. Debounced so rapid score taps don't spam
- * the function; the trailing call always wins. Returns false when offline.
+ * Publish a snapshot for a group. Debounced briefly so rapid score taps
+ * coalesce; the trailing call always wins. Returns false when offline.
  */
 let publishTimer: ReturnType<typeof setTimeout> | null = null;
-let lastPublishAttempt = 0;
 
 export const publishLiveState = (snapshot: LiveSnapshot): void => {
   if (!isLiveSyncAvailable()) return;
 
   if (publishTimer) clearTimeout(publishTimer);
-  const run = async () => {
-    // Basic client-side rate limit: at most one publish per second
-    const now = Date.now();
-    if (now - lastPublishAttempt < 1000) return;
-    lastPublishAttempt = now;
+  publishTimer = setTimeout(async () => {
     try {
       await fetch(endpoint(snapshot.groupName), {
         method: 'POST',
@@ -53,8 +48,7 @@ export const publishLiveState = (snapshot: LiveSnapshot): void => {
     } catch {
       // Offline or function unavailable — spectators fall back to local view
     }
-  };
-  publishTimer = setTimeout(run, PUBLISH_DEBOUNCE_MS);
+  }, PUBLISH_DEBOUNCE_MS);
 };
 
 /**
@@ -74,7 +68,9 @@ export const fetchLiveState = async (group: string): Promise<LiveSnapshot | null
 };
 
 /**
- * Poll a group's snapshot every POLL_INTERVAL_MS. Returns a cancel function.
+ * Poll a group's snapshot every POLL_INTERVAL_MS. Pauses while the tab is
+ * hidden (saves invocations) and refreshes immediately on return.
+ * Returns a cancel function.
  */
 export const pollLiveState = (
   group: string,
@@ -91,8 +87,19 @@ export const pollLiveState = (
   };
   tick();
 
+  const handleVisibility = () => {
+    if (cancelled) return;
+    if (document.visibilityState === 'visible') {
+      // Refresh immediately when coming back to the tab
+      if (timer) clearTimeout(timer);
+      tick();
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibility);
+
   return () => {
     cancelled = true;
     if (timer) clearTimeout(timer);
+    document.removeEventListener('visibilitychange', handleVisibility);
   };
 };
