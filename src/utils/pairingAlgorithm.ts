@@ -6,23 +6,63 @@ export const getPlayerSkill = (player: Player): number => {
   return player.eloRating;
 };
 
+/** ELO band within which players are considered equals and shuffled randomly. */
+const ELO_BUCKET_WIDTH = 10;
+
+const shuffle = <T,>(items: T[]): T[] => {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+/**
+ * Order players deterministically by ELO (desc), shuffling only within bands of
+ * near-equal ELO. Shuffling the data up front keeps Array.sort's comparator
+ * consistent (a random comparator is undefined behavior) while preserving
+ * variety among equals.
+ */
+const orderPlayersForPairing = (players: Player[]): Player[] => {
+  const sorted = [...players].sort((a, b) => b.eloRating - a.eloRating);
+  const result: Player[] = [];
+  let bucket: Player[] = [];
+
+  const flushBucket = () => {
+    if (bucket.length > 0) {
+      result.push(...shuffle(bucket));
+      bucket = [];
+    }
+  };
+
+  sorted.forEach(player => {
+    if (
+      bucket.length === 0 ||
+      bucket[0].eloRating - player.eloRating < ELO_BUCKET_WIDTH
+    ) {
+      bucket.push(player);
+    } else {
+      flushBucket();
+      bucket = [player];
+    }
+  });
+  flushBucket();
+
+  return result;
+};
+
 /**
  * Improved pairing algorithm using ELO-based skill assessment with greedy approach
- * Players are sorted by ELO rating and paired to maximize variety and balance
+ * Players are ordered by ELO rating (with randomness only within equal-ELO bands)
+ * and paired to maximize variety and balance
  */
 export const generatePairs = (
   activePlayers: Player[],
   partnershipHistory: PartnershipHistory
 ): Pair[] => {
-  // Sort players by ELO rating (higher ELO = better player)
-  const sortedPlayers = [...activePlayers].sort((a, b) => {
-    const eloA = a.eloRating;
-    const eloB = b.eloRating;
-    if (Math.abs(eloA - eloB) < 10) {
-      return Math.random() - 0.5; // Add randomness for similar ELO
-    }
-    return eloB - eloA;
-  });
+  // Deterministic ELO order with shuffling confined to near-equal bands
+  const sortedPlayers = orderPlayersForPairing(activePlayers);
 
   const pairs: Pair[] = [];
   const usedPlayers = new Set<string>();
@@ -78,6 +118,30 @@ export const generatePairs = (
     } else {
       break;
     }
+  }
+
+  return pairs;
+};
+
+/**
+ * Snake-style pairing: strongest with weakest, second strongest with second
+ * weakest, etc. Used periodically so strong players regularly mix with the
+ * whole group instead of only ever facing their own skill tier.
+ * Callers must have already removed sitting-out players.
+ */
+export const generateSnakePairs = (activePlayers: Player[]): Pair[] => {
+  const sorted = [...activePlayers].sort((a, b) => b.eloRating - a.eloRating);
+  const pairs: Pair[] = [];
+
+  for (let i = 0; i < sorted.length / 2; i++) {
+    const strong = sorted[i];
+    const weak = sorted[sorted.length - 1 - i];
+    if (strong.id === weak.id) break; // odd leftover — caller handles sit-outs
+    pairs.push({
+      id: `pair-${pairs.length}`,
+      players: [strong, weak],
+      avgSkill: (strong.eloRating + weak.eloRating) / 2
+    });
   }
 
   return pairs;
